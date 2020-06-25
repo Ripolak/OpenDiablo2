@@ -15,14 +15,16 @@ type ErrorMessage struct {
 }
 
 func (e *ErrorMessage) DisplayError(screen d2render.Surface) {
-	e.renderSprite(screen)
+	var x = 280
+	var y = 175
+	e.renderSprite(x, y, screen)
 	e.renderLabel(screen)
 	e.renderButton()
 }
 
 func (e *ErrorMessage) renderLabel(screen d2render.Surface) {
 	var label = d2ui.CreateLabel(d2resource.Font16, d2resource.PaletteUnits)
-	lines := d2common.SplitIntoLinesWithMaxWidth("An error has occurred: "+e.ErrorText, 29)
+	lines := d2common.SplitIntoLinesWithMaxWidth("An error has occurred: "+e.ErrorText, 30)
 	label.SetText(strings.Join(lines, "\n"))
 	label.Alignment = d2ui.LabelAlignCenter
 	label.SetPosition(400, 185)
@@ -30,10 +32,10 @@ func (e *ErrorMessage) renderLabel(screen d2render.Surface) {
 	label.Render(screen)
 }
 
-func (e *ErrorMessage) renderSprite(screen d2render.Surface) {
+func (e *ErrorMessage) renderSprite(x int, y int, screen d2render.Surface) {
 	var animation, _ = d2asset.LoadAnimation(d2resource.PopUpOkCancel, d2resource.PaletteFechar)
 	var okCancelBox, _ = d2ui.LoadSprite(animation)
-	okCancelBox.SetPosition(280, 175)
+	okCancelBox.SetPosition(x, y)
 	okCancelBox.RenderSegmented(screen, 2, 1, 0)
 }
 
