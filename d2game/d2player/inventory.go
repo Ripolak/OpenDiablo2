@@ -2,6 +2,7 @@ package d2player
 
 import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2errors"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2inventory"
@@ -145,4 +146,6 @@ func (g *Inventory) Render(target d2render.Surface) {
 	g.panel.Render(target)
 
 	g.grid.Render(target)
+	var err = d2errors.ErrorMessage{ErrorText: "Some generic error"}
+	err.DisplayError(target)
 }
