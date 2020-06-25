@@ -146,6 +146,6 @@ func (g *Inventory) Render(target d2render.Surface) {
 	g.panel.Render(target)
 
 	g.grid.Render(target)
-	var err = d2errors.ErrorMessage{ErrorText: "Some generic error"}
+	var err = d2errors.ErrorMessage{ErrorText: "Godammit 5 looks like 6"}
 	err.DisplayError(target)
 }

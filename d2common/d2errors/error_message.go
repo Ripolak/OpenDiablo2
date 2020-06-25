@@ -20,7 +20,7 @@ func (e *ErrorMessage) DisplayError(screen d2render.Surface) {
 	var y = 175
 	e.renderSprite(x, y, screen)
 	e.renderLabel(x, y, spriteLen, screen)
-	e.renderButton()
+	e.renderButton(x, spriteLen)
 }
 
 func (e *ErrorMessage) renderLabel(spriteX int, spriteY int, spriteLen int, screen d2render.Surface) {
@@ -47,9 +47,10 @@ func (e *ErrorMessage) renderSprite(x int, y int, screen d2render.Surface) {
 	okCancelBox.RenderSegmented(screen, 2, 1, 0)
 }
 
-func (e *ErrorMessage) renderButton() {
+func (e *ErrorMessage) renderButton(spriteX int, spriteLen int) {
 	var button = d2ui.CreateButton(d2ui.ButtonTypeOkCancel, "Ok")
-	button.SetPosition(373, 308)
+	button.SetPosition(spriteX+(spriteLen/2)-47, 308)
+	// TODO: Move the X calculation elsewhere. The 47 is because its half of 94, which is the length of the button.
 	button.SetVisible(true)
 	button.OnActivated(func() {})
 	d2ui.AddWidget(&button)
