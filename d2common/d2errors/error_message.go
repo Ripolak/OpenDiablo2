@@ -15,21 +15,29 @@ type ErrorMessage struct {
 }
 
 func (e *ErrorMessage) DisplayError(screen d2render.Surface) {
+	var spriteLen = 263
 	var x = 280
 	var y = 175
 	e.renderSprite(x, y, screen)
-	e.renderLabel(screen)
+	e.renderLabel(x, y, spriteLen, screen)
 	e.renderButton()
 }
 
-func (e *ErrorMessage) renderLabel(screen d2render.Surface) {
+func (e *ErrorMessage) renderLabel(spriteX int, spriteY int, spriteLen int, screen d2render.Surface) {
 	var label = d2ui.CreateLabel(d2resource.Font16, d2resource.PaletteUnits)
 	lines := d2common.SplitIntoLinesWithMaxWidth("An error has occurred: "+e.ErrorText, 30)
 	label.SetText(strings.Join(lines, "\n"))
 	label.Alignment = d2ui.LabelAlignCenter
-	label.SetPosition(400, 185)
+	var x, y = getLabelCoords(spriteX, spriteY, spriteLen)
+	label.SetPosition(x, y)
 	screen.DrawRect(800, 600, color.RGBA{A: 128})
 	label.Render(screen)
+}
+
+func getLabelCoords(spriteX int, spriteY int, spriteLen int) (int, int) {
+	var x = spriteX + (spriteLen / 2)
+	var y = spriteY + 10
+	return x, y
 }
 
 func (e *ErrorMessage) renderSprite(x int, y int, screen d2render.Surface) {
