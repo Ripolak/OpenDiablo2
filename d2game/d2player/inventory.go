@@ -76,7 +76,6 @@ func (g *Inventory) Render(target d2render.Surface) {
 	if !g.isOpen {
 		return
 	}
-
 	x, y := g.originX, g.originY
 
 	// Frame
