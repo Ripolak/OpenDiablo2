@@ -6,8 +6,11 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
 )
 
+// DifficultyLevels contain the difficulty records for each difficulty
+//nolint:gochecknoglobals // Current design is to have these global
 var DifficultyLevels map[string]*DifficultyLevelRecord
 
+// DifficultyLevelRecord contain the parameters that change for different difficultios
 type DifficultyLevelRecord struct {
 	// Difficulty name. it is hardcoded and you cannot add new ones unless you do
 	// some Code Edits
@@ -30,7 +33,7 @@ type DifficultyLevelRecord struct {
 	// txt file...
 
 	// Not used. Pre 1.07 it was the percentage of magic, rare, set and unique
-	// exceptional items dropped on this difficuly.
+	// exceptional items dropped on this difficulty.
 	DropChanceMagic  int // UberCodeOddsGood
 	DropChanceRare   int // UberCodeOddsGood
 	DropChanceSet    int // UberCodeOddsGood
@@ -55,7 +58,7 @@ type DifficultyLevelRecord struct {
 	ManaStealDivisor int // ManaStealDivisor
 
 	// -----------------------------------------------------------------------
-	// Gravestench: The rest of these are listed on PK page, but not present in
+	// The rest of these are listed on PK page, but not present in
 	// my copy of the txt file (patch_d2/data/global/excel/difficultylevels.txt)
 	// so I am going to leave these comments
 
@@ -89,6 +92,7 @@ type DifficultyLevelRecord struct {
 
 }
 
+// LoadDifficultyLevels is a loader for difficultylevels.txt
 func LoadDifficultyLevels(file []byte) {
 	dict := d2common.LoadDataDictionary(string(file))
 	numRows := len(dict.Data)
@@ -119,5 +123,4 @@ func LoadDifficultyLevels(file []byte) {
 	}
 
 	log.Printf("Loaded %d DifficultyLevel records", len(DifficultyLevels))
-
 }

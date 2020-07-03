@@ -3,9 +3,10 @@ package d2gui
 import (
 	"image/color"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2input"
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render"
 )
 
 type layoutEntry struct {
@@ -103,6 +104,16 @@ func (l *Layout) AddSprite(imagePath, palettePath string) (*Sprite, error) {
 	return sprite, nil
 }
 
+func (l *Layout) AddAnimatedSprite(imagePath, palettePath string, direction AnimationDirection) (*AnimatedSprite, error) {
+	sprite, err := createAnimatedSprite(imagePath, palettePath, direction)
+	if err != nil {
+		return nil, err
+	}
+
+	l.entries = append(l.entries, &layoutEntry{widget: sprite})
+	return sprite, nil
+}
+
 func (l *Layout) AddLabel(text string, fontStyle FontStyle) (*Label, error) {
 	label, err := createLabel(text, fontStyle)
 	if err != nil {
@@ -127,8 +138,8 @@ func (l *Layout) Clear() {
 	l.entries = nil
 }
 
-func (l *Layout) render(target d2render.Surface) error {
-	l.adjustEntryPlacement()
+func (l *Layout) render(target d2interface.Surface) error {
+	l.AdjustEntryPlacement()
 
 	for _, entry := range l.entries {
 		if !entry.widget.isVisible() {
@@ -139,9 +150,10 @@ func (l *Layout) render(target d2render.Surface) error {
 			return err
 		}
 
-		if err := l.renderEntryDebug(entry, target); err != nil {
-			return err
-		}
+		// uncomment to see debug boxes
+		//if err := l.renderEntryDebug(entry, target); err != nil {
+		//	return err
+		//}
 	}
 
 	return nil
@@ -157,14 +169,14 @@ func (l *Layout) advance(elapsed float64) error {
 	return nil
 }
 
-func (l *Layout) renderEntry(entry *layoutEntry, target d2render.Surface) error {
+func (l *Layout) renderEntry(entry *layoutEntry, target d2interface.Surface) error {
 	target.PushTranslation(entry.x, entry.y)
 	defer target.Pop()
 
 	return entry.widget.render(target)
 }
 
-func (l *Layout) renderEntryDebug(entry *layoutEntry, target d2render.Surface) error {
+func (l *Layout) renderEntryDebug(entry *layoutEntry, target d2interface.Surface) error {
 	target.PushTranslation(entry.x, entry.y)
 	defer target.Pop()
 
@@ -284,7 +296,7 @@ func (l *Layout) adjustEntryEvent(entry *layoutEntry, eventX, eventY *int) bool 
 	return true
 }
 
-func (l *Layout) adjustEntryPlacement() {
+func (l *Layout) AdjustEntryPlacement() {
 	width, height := l.getSize()
 
 	var expanderCount int
@@ -347,5 +359,7 @@ func (l *Layout) adjustEntryPlacement() {
 		case PositionTypeAbsolute:
 			entry.x, entry.y = entry.widget.getPosition()
 		}
+
+		entry.widget.setOffset(offsetX, offsetY)
 	}
 }

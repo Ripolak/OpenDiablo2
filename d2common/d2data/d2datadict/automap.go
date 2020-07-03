@@ -7,6 +7,11 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
 )
 
+const (
+	expansion = "Expansion" // blizzard put this in the txt where expansion data starts
+)
+
+//nolint:gochecknoglobals // Currently global by design, only written once
 var frameFields = []string{"Cel1", "Cel2", "Cel3", "Cel4"}
 
 // AutoMapRecord represents one row from d2data.mpq/AutoMap.txt.
@@ -27,7 +32,6 @@ type AutoMapRecord struct {
 	// StartSequence and EndSequence are sub indices the
 	// same 2D array as Style. They describe a range of
 	// tiles for which covered by this AutoMapRecord.
-	//
 	// In some rows you can find a value of -1. This means
 	// the game will only look at Style and TileName to
 	// determine which tiles are addressed.
@@ -39,10 +43,10 @@ type AutoMapRecord struct {
 	// whatever you like..."
 	// The values seem functional but naming conventions
 	// vary between LevelNames.
-	//Type1 string
-	//Type2 string
-	//Type3 string
-	//Type4 string // Note: I commented these out for now because they supposedly aren't useful see the LoadAutoMaps function.
+	// Type1 string
+	// Type2 string
+	// Type3 string
+	// Type4 string // Note: I commented these out for now because they supposedly aren't useful see the LoadAutoMaps function.
 
 	// Frames determine the frame of the MaxiMap(s).dc6 that
 	// will be applied to the specified tiles. The frames
@@ -50,7 +54,6 @@ type AutoMapRecord struct {
 	// re-extract the chart with Dc6Table, you can specify
 	// how many graphics a line can hold), line 1 includes
 	// icons 0-19, line 2 from 20 to 39 etc.
-	//
 	// Multiple values exist for Cel (and Type) to enable
 	// variation. Presumably game chooses randomly between
 	// any of the 4 values which are not set to -1.
@@ -58,6 +61,7 @@ type AutoMapRecord struct {
 }
 
 // AutoMaps contains all data in AutoMap.txt.
+//nolint:gochecknoglobals // Current design is to have these global
 var AutoMaps []*AutoMapRecord
 
 // LoadAutoMaps populates AutoMaps with the data from AutoMap.txt.
@@ -71,9 +75,9 @@ func LoadAutoMaps(file []byte) {
 
 	// Construct records
 	AutoMaps = make([]*AutoMapRecord, len(d.Data))
+
 	for idx := range d.Data {
-		// Row 2603 is a separator with all empty field values
-		if idx == 2603 {
+		if d.GetString("LevelName", idx) == expansion {
 			continue
 		}
 
@@ -88,7 +92,9 @@ func LoadAutoMaps(file []byte) {
 			//Type1: d.GetString("Type1", idx),
 			//Type2: d.GetString("Type2", idx),
 			//Type3: d.GetString("Type3", idx),
-			//Type4: d.GetString("Type4", idx), // Note: I commented these out for now because they supposedly aren't useful see the AutoMapRecord struct.
+			//Type4: d.GetString("Type4", idx),
+			// Note: I commented these out for now because they supposedly
+			// aren't useful see the AutoMapRecord struct.
 		}
 
 		AutoMaps[idx].Frames = make([]int, len(frameFields))

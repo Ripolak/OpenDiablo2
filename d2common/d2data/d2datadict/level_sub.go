@@ -6,15 +6,18 @@ import (
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
 )
 
+// LevelSubstitutionRecord is a representation of a row from lvlsub.txt
+// these records are parameters for levels and describe substitution rules
 type LevelSubstitutionRecord struct {
 	// Description, reference only.
 	Name string // Name
+
 	// This value is used in Levels.txt, in the column 'SubType'. You'll notice
 	// that in LvlSub.txt some rows use the same value, we can say they forms
 	// groups. If you count each row of a group starting from 0, then you'll
 	// obtain what is written in Levels.txt, columns 'SubTheme', 'SubWaypoint'
 	// and 'SubShrine'. (added by Paul Siramy)
-	Id int // Type
+	ID int // Type
 
 	// What .ds1 is being used.
 	File string // File
@@ -61,18 +64,20 @@ type LevelSubstitutionRecord struct {
 	// Beta
 }
 
+// LevelSubstitutions stores all of the LevelSubstitutionRecords
+//nolint:gochecknoglobals // Currently global by design
 var LevelSubstitutions map[int]*LevelSubstitutionRecord
 
+// LoadLevelSubstitutions loads lvlsub.txt and parses into records
 func LoadLevelSubstitutions(file []byte) {
 	dict := d2common.LoadDataDictionary(string(file))
 	numRecords := len(dict.Data)
 	LevelSubstitutions = make(map[int]*LevelSubstitutionRecord, numRecords)
 
 	for idx := range dict.Data {
-
 		record := &LevelSubstitutionRecord{
 			Name:         dict.GetString("Name", idx),
-			Id:           dict.GetNumber("Type", idx),
+			ID:           dict.GetNumber("Type", idx),
 			File:         dict.GetString("File", idx),
 			IsExpansion:  dict.GetNumber("Expansion", idx) > 0,
 			BorderType:   dict.GetNumber("BordType", idx),
@@ -95,7 +100,8 @@ func LoadLevelSubstitutions(file []byte) {
 			GridMax4:     dict.GetNumber("Max4", idx),
 		}
 
-		LevelSubstitutions[record.Id] = record
+		LevelSubstitutions[record.ID] = record
 	}
+
 	log.Printf("Loaded %d LevelSubstitution records", len(LevelSubstitutions))
 }

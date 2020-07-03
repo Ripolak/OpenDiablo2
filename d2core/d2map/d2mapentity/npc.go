@@ -3,67 +3,81 @@ package d2mapentity
 import (
 	"math/rand"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2datadict"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render"
 )
 
 type NPC struct {
 	mapEntity
-	composite    *d2asset.Composite
-	action       int
-	HasPaths     bool
-	Paths        []d2common.Path
-	path         int
-	isDone       bool
-	repetitions  int
-	direction    int
-	objectLookup *d2datadict.ObjectLookupRecord
-	name string
+	composite     *d2asset.Composite
+	action        int
+	HasPaths      bool
+	Paths         []d2common.Path
+	path          int
+	isDone        bool
+	repetitions   int
+	direction     int
+	objectLookup  *d2datadict.ObjectLookupRecord
+	monstatRecord *d2datadict.MonStatsRecord
+	monstatEx     *d2datadict.MonStats2Record
+	name          string
 }
 
-func CreateNPC(x, y int, object *d2datadict.ObjectLookupRecord, direction int) *NPC {
+func CreateNPC(x, y int, monstat *d2datadict.MonStatsRecord, direction int) *NPC {
+	result := &NPC{
+		mapEntity:     createMapEntity(x, y),
+		HasPaths:      false,
+		monstatRecord: monstat,
+		monstatEx:     d2datadict.MonStats2[monstat.ExtraDataKey],
+	}
+
+	object := &d2datadict.ObjectLookupRecord{
+		Base:  "/Data/Global/Monsters",
+		Token: monstat.AnimationDirectoryToken,
+		Mode:  result.monstatEx.ResurrectMode.String(),
+		Class: result.monstatEx.BaseWeaponClass,
+		TR:    selectEquip(result.monstatEx.TRv),
+		LG:    selectEquip(result.monstatEx.LGv),
+		RH:    selectEquip(result.monstatEx.RHv),
+		SH:    selectEquip(result.monstatEx.SHv),
+		RA:    selectEquip(result.monstatEx.Rav),
+		LA:    selectEquip(result.monstatEx.Lav),
+		LH:    selectEquip(result.monstatEx.LHv),
+		HD:    selectEquip(result.monstatEx.HDv),
+	}
+	result.objectLookup = object
 	composite, err := d2asset.LoadComposite(object, d2resource.PaletteUnits)
+	result.composite = composite
+
 	if err != nil {
 		panic(err)
 	}
 
-	result := &NPC{
-		mapEntity:    createMapEntity(x, y),
-		composite:    composite,
-		objectLookup: object,
-		HasPaths:     false,
-	}
 	result.SetMode(object.Mode, object.Class, direction)
 	result.mapEntity.directioner = result.rotate
 
-	switch object.Act {
-	case 1:
-		switch object.Id {
-		case 0:
-			result.name = "Gheed"
-		case 1:
-			result.name = "Cain"
-		case 2:
-			result.name = "Akara"
-		case 5:
-			result.name = "Kashya"
-		case 7:
-			result.name = "Warriv"
-		case 8:
-			result.name = "Charsi"
-		case 9:
-			result.name = "Andariel"
-		}
+	if result.monstatRecord != nil && result.monstatRecord.IsInteractable {
+		result.name = d2common.TranslateString(result.monstatRecord.NameStringTableKey)
 	}
 
 	return result
 }
 
-func (v *NPC) Render(target d2render.Surface) {
+func selectEquip(slice []string) string {
+	if len(slice) != 0 {
+		return slice[rand.Intn(len(slice))]
+	}
+
+	return ""
+}
+
+
+func (v *NPC) Render(target d2interface.Surface) {
 	target.PushTranslation(
 		v.offsetX+int((v.subcellX-v.subcellY)*16),
 		v.offsetY+int(((v.subcellX+v.subcellY)*8)-5),
@@ -163,6 +177,14 @@ func (v *NPC) SetMode(animationMode, weaponClass string, direction int) error {
 	}
 
 	return err
+}
+
+func (m *NPC) Selectable() bool {
+	// is there something handy that determines selectable npc's?
+	if m.name != "" {
+		return true
+	}
+	return false
 }
 
 func (m *NPC) Name() string {

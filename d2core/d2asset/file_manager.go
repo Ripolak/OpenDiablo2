@@ -1,6 +1,7 @@
 package d2asset
 
 import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq"
 	"strings"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
@@ -15,11 +16,22 @@ const (
 type fileManager struct {
 	cache          *d2common.Cache
 	archiveManager *archiveManager
-	config         d2config.Configuration
+	config         *d2config.Configuration
 }
 
-func createFileManager(config d2config.Configuration, archiveManager *archiveManager) *fileManager {
+func createFileManager(config *d2config.Configuration, archiveManager *archiveManager) *fileManager {
 	return &fileManager{d2common.CreateCache(fileBudget), archiveManager, config}
+}
+
+func (fm *fileManager) loadFileStream(filePath string) (*d2mpq.MpqDataStream, error) {
+	filePath = fm.fixupFilePath(filePath)
+
+	archive, err := fm.archiveManager.loadArchiveForFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return archive.ReadFileStream(filePath)
 }
 
 func (fm *fileManager) loadFile(filePath string) ([]byte, error) {

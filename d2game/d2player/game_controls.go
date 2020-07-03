@@ -1,21 +1,22 @@
 package d2player
 
 import (
+	"image"
 	"image/color"
 	"log"
 	"math"
 	"time"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2datadict"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2input"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapentity"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer"
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render"
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2term"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui"
 )
 
@@ -33,6 +34,10 @@ var staminaBarWidth = 102.0
 var globeHeight = 80
 var globeWidth = 80
 
+var leftMenuRect = d2common.Rectangle{Left: 0, Top: 0, Width: 400, Height: 600}
+var rightMenuRect = d2common.Rectangle{Left: 400, Top: 0, Width: 400, Height: 600}
+var bottomMenuRect = d2common.Rectangle{Left: 0, Top: 550, Width: 800, Height: 50}
+
 type GameControls struct {
 	hero              *d2mapentity.Player
 	mapEngine         *d2mapengine.MapEngine
@@ -43,14 +48,10 @@ type GameControls struct {
 	FreeCam           bool
 	lastMouseX        int
 	lastMouseY        int
-	lastHealthPercent float64
-	lastManaPercent   float64
 
 	// UI
 	globeSprite        *d2ui.Sprite
 	hpManaStatusSprite *d2ui.Sprite
-	hpStatusBar        d2render.Surface
-	manaStatusBar      d2render.Surface
 	mainPanel          *d2ui.Sprite
 	menuButton         *d2ui.Sprite
 	skillIcon          *d2ui.Sprite
@@ -79,8 +80,8 @@ const (
 	rightSkill = ActionableType(iota)
 )
 
-func NewGameControls(hero *d2mapentity.Player, mapEngine *d2mapengine.MapEngine, mapRenderer *d2maprenderer.MapRenderer, inputListener InputCallbackListener) *GameControls {
-	d2term.BindAction("setmissile", "set missile id to summon on right click", func(id int) {
+func NewGameControls(hero *d2mapentity.Player, mapEngine *d2mapengine.MapEngine, mapRenderer *d2maprenderer.MapRenderer, inputListener InputCallbackListener, term d2interface.Terminal) *GameControls {
+	term.BindAction("setmissile", "set missile id to summon on right click", func(id int) {
 		missileID = id
 	})
 
@@ -114,7 +115,7 @@ func NewGameControls(hero *d2mapentity.Player, mapEngine *d2mapengine.MapEngine,
 		},
 	}
 
-	d2term.BindAction("freecam", "toggle free camera movement", func() {
+	term.BindAction("freecam", "toggle free camera movement", func() {
 		gc.FreeCam = !gc.FreeCam
 	})
 
@@ -185,15 +186,15 @@ func (g *GameControls) OnMouseButtonRepeat(event d2input.MouseEvent) bool {
 	py = float64(int(py*10)) / 10.0
 
 	now := d2common.Now()
-	if event.Button == d2input.MouseButtonLeft && now-lastLeftBtnActionTime >= mouseBtnActionsTreshhold {
+	if event.Button == d2input.MouseButtonLeft && now-lastLeftBtnActionTime >= mouseBtnActionsTreshhold && !g.isInActiveMenusRect(event.X, event.Y) {
 		lastLeftBtnActionTime = now
 		g.inputListener.OnPlayerMove(px, py)
 		return true
 	}
 
-	if event.Button == d2input.MouseButtonRight && now-lastRightBtnActionTime >= mouseBtnActionsTreshhold {
+	if event.Button == d2input.MouseButtonRight && now-lastRightBtnActionTime >= mouseBtnActionsTreshhold && !g.isInActiveMenusRect(event.X, event.Y) {
 		lastRightBtnActionTime = now
-		g.ShootMissile(px, py)
+		g.inputListener.OnPlayerCast(missileID, px, py)
 		return true
 	}
 
@@ -216,7 +217,6 @@ func (g *GameControls) OnMouseMove(event d2input.MouseMoveEvent) bool {
 }
 
 func (g *GameControls) OnMouseButtonDown(event d2input.MouseEvent) bool {
-
 	mx, my := event.X, event.Y
 	for i := range g.actionableRegions {
 		// If click is on a game control element
@@ -230,43 +230,19 @@ func (g *GameControls) OnMouseButtonDown(event d2input.MouseEvent) bool {
 	px = float64(int(px*10)) / 10.0
 	py = float64(int(py*10)) / 10.0
 
-	if event.Button == d2input.MouseButtonLeft {
+	if event.Button == d2input.MouseButtonLeft && !g.isInActiveMenusRect(mx, my) {
 		lastLeftBtnActionTime = d2common.Now()
 		g.inputListener.OnPlayerMove(px, py)
 		return true
 	}
 
-	if event.Button == d2input.MouseButtonRight {
+	if event.Button == d2input.MouseButtonRight && !g.isInActiveMenusRect(mx, my) {
 		lastRightBtnActionTime = d2common.Now()
-		return g.ShootMissile(px, py)
+		g.inputListener.OnPlayerCast(missileID, px, py)
+		return true
 	}
 
 	return false
-}
-
-func (g *GameControls) ShootMissile(px float64, py float64) bool {
-	missile, err := d2mapentity.CreateMissile(
-		int(g.hero.LocationX),
-		int(g.hero.LocationY),
-		d2datadict.Missiles[missileID],
-	)
-	if err != nil {
-		return false
-	}
-
-	rads := d2common.GetRadiansBetween(
-		g.hero.LocationX,
-		g.hero.LocationY,
-		px*5,
-		py*5,
-	)
-
-	missile.SetRadians(rads, func() {
-		g.mapEngine.RemoveEntity(missile)
-	})
-
-	g.mapEngine.AddEntity(missile)
-	return true
 }
 
 func (g *GameControls) Load() {
@@ -275,8 +251,6 @@ func (g *GameControls) Load() {
 
 	animation, _ = d2asset.LoadAnimation(d2resource.HealthManaIndicator, d2resource.PaletteSky)
 	g.hpManaStatusSprite, _ = d2ui.LoadSprite(animation)
-
-	g.hpStatusBar, _ = d2render.NewSurface(globeWidth, globeHeight, d2render.FilterNearest)
 
 	animation, _ = d2asset.LoadAnimation(d2resource.GamePanels, d2resource.PaletteSky)
 	g.mainPanel, _ = d2ui.LoadSprite(animation)
@@ -317,27 +291,49 @@ func (g *GameControls) Advance(elapsed float64) error {
 }
 
 func (g *GameControls) updateLayout() {
-	isRightPanelOpen := false
-	isLeftPanelOpen := false
-
-	// todo : add same logic when adding quest log and skill tree
-	isRightPanelOpen = g.inventory.isOpen || isRightPanelOpen
-	isLeftPanelOpen = g.heroStatsPanel.isOpen || isLeftPanelOpen
+	isRightPanelOpen := g.isLeftPanelOpen()
+	isLeftPanelOpen := g.isRightPanelOpen()
 
 	if isRightPanelOpen == isLeftPanelOpen {
 		g.mapRenderer.ViewportDefault()
-	} else if isRightPanelOpen == true {
+	} else if isRightPanelOpen {
 		g.mapRenderer.ViewportToLeft()
 	} else {
 		g.mapRenderer.ViewportToRight()
 	}
 }
 
+func (g *GameControls) isLeftPanelOpen() bool {
+	// TODO: add quest log panel
+	return g.heroStatsPanel.IsOpen()
+}
+
+func (g *GameControls) isRightPanelOpen() bool {
+	// TODO: add skills tree panel
+	return g.inventory.IsOpen()
+}
+
+func (g *GameControls) isInActiveMenusRect(px int, py int) bool {
+	if bottomMenuRect.IsInRect(px, py) {
+		return true
+	}
+
+	if g.isLeftPanelOpen() && leftMenuRect.IsInRect(px, py) {
+		return true
+	}
+
+	if g.isRightPanelOpen() && rightMenuRect.IsInRect(px, py) {
+		return true
+	}
+
+	return false
+}
+
 // TODO: consider caching the panels to single image that is reused.
-func (g *GameControls) Render(target d2render.Surface) {
+func (g *GameControls) Render(target d2interface.Surface) {
 	for entityIdx := range *g.mapEngine.Entities() {
 		entity := (*g.mapEngine.Entities())[entityIdx]
-		if entity.Name() == "" {
+		if !entity.Selectable() {
 			continue
 		}
 
@@ -350,6 +346,7 @@ func (g *GameControls) Render(target d2render.Surface) {
 			g.nameLabel.SetText(entity.Name())
 			g.nameLabel.SetPosition(entScreenX, entScreenY-100)
 			g.nameLabel.Render(target)
+			entity.Highlight()
 			break
 		}
 	}
@@ -366,27 +363,17 @@ func (g *GameControls) Render(target d2render.Surface) {
 	g.mainPanel.SetPosition(offset, height)
 	g.mainPanel.Render(target)
 
+	// Health status bar
+	healthPercent := float64(g.hero.Stats.Health) / float64(g.hero.Stats.MaxHealth)
+	hpBarHeight := int(healthPercent * float64(globeHeight))
+	g.hpManaStatusSprite.SetCurrentFrame(0)
+	g.hpManaStatusSprite.SetPosition(offset+30, height-13)
+	g.hpManaStatusSprite.RenderSection(target, image.Rect(0, globeHeight-hpBarHeight, globeWidth, globeHeight))
+
 	// Left globe
 	g.globeSprite.SetCurrentFrame(0)
 	g.globeSprite.SetPosition(offset+28, height-5)
 	g.globeSprite.Render(target)
-
-	// Health status bar
-	healthPercent := float64(g.hero.Stats.Health) / float64(g.hero.Stats.MaxHealth)
-	hpBarHeight := int(healthPercent * float64(globeHeight))
-	if g.lastHealthPercent != healthPercent {
-		g.hpStatusBar, _ = d2render.NewSurface(globeWidth, hpBarHeight, d2render.FilterNearest)
-		g.hpManaStatusSprite.SetCurrentFrame(0)
-		g.hpStatusBar.PushTranslation(0, hpBarHeight)
-
-		g.hpManaStatusSprite.Render(g.hpStatusBar)
-		g.hpStatusBar.Pop()
-		g.lastHealthPercent = healthPercent
-	}
-
-	target.PushTranslation(30, 508+(globeHeight-hpBarHeight))
-	target.Render(g.hpStatusBar)
-	target.Pop()
 
 	offset += w
 
@@ -413,7 +400,7 @@ func (g *GameControls) Render(target d2render.Surface) {
 
 	// Stamina status bar
 	target.PushTranslation(273, 572)
-	target.PushCompositeMode(d2render.CompositeModeLighter)
+	target.PushCompositeMode(d2enum.CompositeModeLighter)
 	staminaPercent := float64(g.hero.Stats.Stamina) / float64(g.hero.Stats.MaxStamina)
 	target.DrawRect(int(staminaPercent*staminaBarWidth), 19, color.RGBA{R: 175, G: 136, B: 72, A: 200})
 	target.PopN(2)
@@ -457,28 +444,18 @@ func (g *GameControls) Render(target d2render.Surface) {
 	g.mainPanel.SetPosition(offset, height)
 	g.mainPanel.Render(target)
 
+	// Mana status bar
+	manaPercent := float64(g.hero.Stats.Mana) / float64(g.hero.Stats.MaxMana)
+	manaBarHeight := int(manaPercent * float64(globeHeight))
+	g.hpManaStatusSprite.SetCurrentFrame(1)
+	g.hpManaStatusSprite.SetPosition(offset+7, height-12)
+	g.hpManaStatusSprite.RenderSection(target, image.Rect(0, globeHeight-manaBarHeight, globeWidth, globeHeight))
+
 	// Right globe
 	g.globeSprite.SetCurrentFrame(1)
 	g.globeSprite.SetPosition(offset+8, height-8)
 	g.globeSprite.Render(target)
 	g.globeSprite.Render(target)
-
-	// Mana status bar
-	manaPercent := float64(g.hero.Stats.Mana) / float64(g.hero.Stats.MaxMana)
-	manaBarHeight := int(manaPercent * float64(globeHeight))
-	if manaPercent != g.lastManaPercent {
-		g.manaStatusBar, _ = d2render.NewSurface(globeWidth, manaBarHeight, d2render.FilterNearest)
-		g.hpManaStatusSprite.SetCurrentFrame(1)
-
-		g.manaStatusBar.PushTranslation(0, manaBarHeight)
-		g.hpManaStatusSprite.Render(g.manaStatusBar)
-		g.manaStatusBar.Pop()
-
-		g.lastManaPercent = manaPercent
-	}
-	target.PushTranslation(offset+8, 508+(globeHeight-manaBarHeight))
-	target.Render(g.manaStatusBar)
-	target.Pop()
 
 	if g.isZoneTextShown {
 		g.zoneChangeText.SetPosition(width/2, height/4)
@@ -500,10 +477,6 @@ func (g *GameControls) HideZoneChangeTextAfter(delay float64) {
 		g.isZoneTextShown = false
 	})
 }
-
-// func (g *GameControls) InEscapeMenu() bool {
-// 	return g != nil && g.escapeMenu != nil && g.escapeMenu.IsOpen()
-// }
 
 // Handles what to do when an actionable is hovered
 func (g *GameControls) onHoverActionable(item ActionableType) {

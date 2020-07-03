@@ -7,11 +7,12 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/go-restruct/restruct v0.0.0-20191227155143-5734170a48a1
-	github.com/hajimehoshi/ebiten v1.11.2
+	github.com/hajimehoshi/ebiten v1.12.0-alpha.6.0.20200629133528-780465b702ce
 	github.com/pkg/profile v1.5.0
 	github.com/robertkrimen/otto v0.0.0-20191219234010-c382bd3c16ff
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.4.0
+	golang.org/x/image v0.0.0-20200119044424-58c23975cae1
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 )

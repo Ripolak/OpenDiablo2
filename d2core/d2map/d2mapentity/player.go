@@ -3,13 +3,14 @@ package d2mapentity
 import (
 	"image/color"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2datadict"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2inventory"
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui"
 )
 
@@ -28,6 +29,7 @@ type Player struct {
 	animationMode string
 	isRunToggled  bool
 	isRunning     bool
+	isCasting     bool
 }
 
 // run speed should be walkspeed * 1.5, since in the original game it is 6 yards walk and 9 yards run.
@@ -117,6 +119,10 @@ func (p Player) IsInTown() bool {
 
 func (v *Player) Advance(tickTime float64) {
 	v.Step(tickTime)
+	if v.IsCasting() && v.composite.GetPlayedCount() >= 1 {
+		v.isCasting = false
+		v.SetAnimationMode(v.GetAnimationMode().String())
+	}
 	v.composite.Advance(tickTime)
 	if v.lastPathSize != len(v.path) {
 		v.lastPathSize = len(v.path)
@@ -127,7 +133,7 @@ func (v *Player) Advance(tickTime float64) {
 	}
 }
 
-func (v *Player) Render(target d2render.Surface) {
+func (v *Player) Render(target d2interface.Surface) {
 	target.PushTranslation(
 		v.offsetX+int((v.subcellX-v.subcellY)*16),
 		v.offsetY+int(((v.subcellX+v.subcellY)*8)-5),
@@ -170,6 +176,10 @@ func (v *Player) GetAnimationMode() d2enum.PlayerAnimationMode {
 		return d2enum.AnimationModePlayerWalk
 	}
 
+	if v.IsCasting() {
+		return d2enum.AnimationModePlayerCast
+	}
+
 	return d2enum.AnimationModePlayerNeutral
 }
 
@@ -188,4 +198,18 @@ func (v *Player) rotate(direction int) {
 
 func (v *Player) Name() string {
 	return v.name
+}
+
+func (v *Player) IsCasting() bool {
+	return v.isCasting
+}
+
+func (v *Player) SetCasting() {
+	v.isCasting = true
+	v.SetAnimationMode(d2enum.AnimationModePlayerCast.String())
+}
+
+func (v *Player) Selectable() bool {
+	// Players are selectable when in town
+	return v.IsInTown()
 }

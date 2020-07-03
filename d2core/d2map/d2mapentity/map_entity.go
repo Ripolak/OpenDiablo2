@@ -3,17 +3,21 @@ package d2mapentity
 import (
 	"math"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2astar"
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2render"
 )
 
 type MapEntity interface {
-	Render(target d2render.Surface)
+	Render(target d2interface.Surface)
 	Advance(tickTime float64)
 	GetPosition() (float64, float64)
+	GetLayer() int
 	GetPositionF() (float64, float64)
 	Name() string
+	Selectable() bool
+	Highlight()
 }
 
 // mapEntity represents an entity on the map that can be animated
@@ -28,6 +32,7 @@ type mapEntity struct {
 	TargetY            float64
 	Speed              float64
 	path               []d2astar.Pather
+	drawLayer          int
 
 	done        func()
 	directioner func(direction int)
@@ -46,13 +51,22 @@ func createMapEntity(x, y int) mapEntity {
 		subcellX:  1 + math.Mod(locX, 5),
 		subcellY:  1 + math.Mod(locY, 5),
 		Speed:     6,
+		drawLayer: 0,
 		path:      []d2astar.Pather{},
 	}
+}
+
+func (m *mapEntity) GetLayer() int {
+	return m.drawLayer
 }
 
 func (m *mapEntity) SetPath(path []d2astar.Pather, done func()) {
 	m.path = path
 	m.done = done
+}
+
+func (m *mapEntity) ClearPath() {
+	m.path = nil
 }
 
 func (m *mapEntity) SetSpeed(speed float64) {
@@ -173,9 +187,16 @@ func (m *mapEntity) GetPosition() (float64, float64) {
 }
 
 func (m *mapEntity) GetPositionF() (float64, float64) {
-	return float64(m.TileX) + (float64(m.subcellX)/5.0), float64(m.TileY) + (float64(m.subcellY)/5.0)
+	return float64(m.TileX) + (float64(m.subcellX) / 5.0), float64(m.TileY) + (float64(m.subcellY) / 5.0)
 }
 
 func (m *mapEntity) Name() string {
 	return ""
+}
+
+func (m *mapEntity) Highlight() {
+}
+
+func (m *mapEntity) Selectable() bool {
+	return false
 }
