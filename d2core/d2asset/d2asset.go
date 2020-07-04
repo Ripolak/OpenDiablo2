@@ -1,30 +1,27 @@
-/*
-Package d2asset has behaviors to load and save assets from disk.
-*/
 package d2asset
 
 import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2config"
 	"log"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2datadict"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dat"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2mpq"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
-
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2config"
 )
 
 var singleton *assetManager
 
 // Initialize creates and assigns all necessary dependencies for the assetManager top-level functions to work correctly
-func Initialize(term d2interface.Terminal) error {
+func Initialize(renderer d2interface.Renderer,
+	term d2interface.Terminal) error {
 	var (
 		config                  = d2config.Get()
-		archiveManager          = createArchiveManager(&config)
-		fileManager             = createFileManager(&config, archiveManager)
+		archiveManager          = createArchiveManager(config)
+		fileManager             = createFileManager(config, archiveManager)
 		paletteManager          = createPaletteManager()
 		paletteTransformManager = createPaletteTransformManager()
-		animationManager        = createAnimationManager()
+		animationManager        = createAnimationManager(renderer)
 		fontManager             = createFontManager()
 	)
 
@@ -54,12 +51,8 @@ func Initialize(term d2interface.Terminal) error {
 	}
 
 	if err := term.BindAction("assetstat", "display asset manager cache statistics", func() {
-		type cache interface {
-			GetWeight() int
-			GetBudget() int
-		}
 
-		var cacheStatistics = func(c cache) float64 {
+		var cacheStatistics = func(c d2interface.Cache) float64 {
 			const percent = 100.0
 			return float64(c.GetWeight()) / float64(c.GetBudget()) * percent
 		}
@@ -124,8 +117,8 @@ func LoadAnimationWithTransparency(animationPath, palettePath string, transparen
 }
 
 // LoadComposite creates a composite object from a ObjectLookupRecord and palettePath describing it
-func LoadComposite(object *d2datadict.ObjectLookupRecord, palettePath string) (*Composite, error) {
-	return CreateComposite(object, palettePath), nil
+func LoadComposite(baseType d2enum.ObjectType, token, palettePath string) (*Composite, error) {
+	return CreateComposite(baseType, token, palettePath), nil
 }
 
 // LoadFont loads a font the resource files

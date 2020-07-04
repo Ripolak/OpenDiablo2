@@ -84,6 +84,7 @@ type MapEngineTest struct {
 	mapEngine   *d2mapengine.MapEngine
 	mapRenderer *d2maprenderer.MapRenderer
 	terminal    d2interface.Terminal
+	renderer    d2interface.Renderer
 
 	//TODO: this is region specific properties, should be refactored for multi-region rendering
 	currentRegion int
@@ -95,7 +96,7 @@ type MapEngineTest struct {
 }
 
 // CreateMapEngineTest creates the Map Engine Test screen and returns a pointer to it
-func CreateMapEngineTest(currentRegion, levelPreset int, term d2interface.Terminal) *MapEngineTest {
+func CreateMapEngineTest(currentRegion, levelPreset int, term d2interface.Terminal, renderer d2interface.Renderer) *MapEngineTest {
 	result := &MapEngineTest{
 		currentRegion: currentRegion,
 		levelPreset:   levelPreset,
@@ -103,6 +104,7 @@ func CreateMapEngineTest(currentRegion, levelPreset int, term d2interface.Termin
 		regionSpec:    regionSpec{},
 		filesCount:    0,
 		terminal:      term,
+		renderer:      renderer,
 	}
 	result.gameState = d2player.CreateTestGameState()
 
@@ -165,7 +167,7 @@ func (met *MapEngineTest) OnLoad(loading d2screen.LoadingState) {
 
 	loading.Progress(0.5)
 
-	met.mapRenderer = d2maprenderer.CreateMapRenderer(met.mapEngine, met.terminal)
+	met.mapRenderer = d2maprenderer.CreateMapRenderer(met.renderer, met.mapEngine, met.terminal)
 
 	loading.Progress(0.7)
 	met.loadRegionByIndex(met.currentRegion, met.levelPreset, met.fileIndex)
@@ -290,28 +292,28 @@ func (met *MapEngineTest) Advance(tickTime float64) error {
 }
 
 // OnKeyRepeat is called to handle repeated key presses
-func (met *MapEngineTest) OnKeyRepeat(event d2input.KeyEvent) bool {
+func (met *MapEngineTest) OnKeyRepeat(event d2interface.KeyEvent) bool {
 	var moveSpeed float64 = 8
-	if event.KeyMod == d2input.KeyModShift {
+	if event.KeyMod() == d2interface.KeyModShift {
 		moveSpeed *= 2
 	}
 
-	if event.Key == d2input.KeyDown {
+	if event.Key() == d2interface.KeyDown {
 		met.mapRenderer.MoveCameraBy(0, moveSpeed)
 		return true
 	}
 
-	if event.Key == d2input.KeyUp {
+	if event.Key() == d2interface.KeyUp {
 		met.mapRenderer.MoveCameraBy(0, -moveSpeed)
 		return true
 	}
 
-	if event.Key == d2input.KeyRight {
+	if event.Key() == d2interface.KeyRight {
 		met.mapRenderer.MoveCameraBy(moveSpeed, 0)
 		return true
 	}
 
-	if event.Key == d2input.KeyLeft {
+	if event.Key() == d2interface.KeyLeft {
 		met.mapRenderer.MoveCameraBy(-moveSpeed, 0)
 		return true
 	}
@@ -320,18 +322,18 @@ func (met *MapEngineTest) OnKeyRepeat(event d2input.KeyEvent) bool {
 }
 
 // OnKeyDown defines the actions of the Map Engine Test screen when a key is pressed
-func (met *MapEngineTest) OnKeyDown(event d2input.KeyEvent) bool {
-	if event.Key == d2input.KeyEscape {
+func (met *MapEngineTest) OnKeyDown(event d2interface.KeyEvent) bool {
+	if event.Key() == d2interface.KeyEscape {
 		os.Exit(0)
 		return true
 	}
 
-	if event.Key == d2input.KeyN {
-		switch event.KeyMod {
-		case d2input.KeyModControl:
+	if event.Key() == d2interface.KeyN {
+		switch event.KeyMod() {
+		case d2interface.KeyModControl:
 			met.fileIndex++
 			d2screen.SetNextScreen(met)
-		case d2input.KeyModShift:
+		case d2interface.KeyModShift:
 			met.levelPreset = increment(met.levelPreset, met.regionSpec.startPresetIndex, met.regionSpec.endPresetIndex)
 			d2screen.SetNextScreen(met)
 		default:
@@ -342,12 +344,12 @@ func (met *MapEngineTest) OnKeyDown(event d2input.KeyEvent) bool {
 		return true
 	}
 
-	if event.Key == d2input.KeyP {
-		switch event.KeyMod {
-		case d2input.KeyModControl:
+	if event.Key() == d2interface.KeyP {
+		switch event.KeyMod() {
+		case d2interface.KeyModControl:
 			met.fileIndex--
 			d2screen.SetNextScreen(met)
-		case d2input.KeyModShift:
+		case d2interface.KeyModShift:
 			met.levelPreset = decrement(met.levelPreset, met.regionSpec.startPresetIndex, met.regionSpec.endPresetIndex)
 			d2screen.SetNextScreen(met)
 		default:
