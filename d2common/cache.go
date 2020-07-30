@@ -2,10 +2,13 @@ package d2common
 
 import (
 	"errors"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"log"
 	"sync"
+
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 )
+
+var _ d2interface.Cache = &Cache{} // Static check to confirm struct conforms to interface
 
 type cacheNode struct {
 	next   *cacheNode
@@ -109,6 +112,7 @@ func (c *Cache) Retrieve(key string) (interface{}, bool) {
 		if node.next != nil {
 			node.next.prev = node.prev
 		}
+
 		if node.prev != nil {
 			node.prev.next = node.next
 		}

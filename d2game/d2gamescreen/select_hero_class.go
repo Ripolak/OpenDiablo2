@@ -1,26 +1,244 @@
 package d2gamescreen
 
 import (
+	"fmt"
 	"image"
-	"image/color"
-
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
-
-	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2player"
-
-	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2client"
-	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2client/d2clientconnectiontype"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2datadict"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
-
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2gui"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2screen"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2ui"
+	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2player"
+	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2client/d2clientconnectiontype"
 )
 
+type heroRenderConfig struct {
+	idleAnimationPath               string
+	idleSelectedAnimationPath       string
+	forwardWalkAnimationPath        string
+	forwardWalkOverlayAnimationPath string
+	forwardWalkOverlayBlend         bool
+	selectedAnimationPath           string
+	selectedOverlayAnimationPath    string
+	backWalkAnimationPath           string
+	backWalkOverlayAnimationPath    string
+	selectionBounds                 image.Rectangle
+	selectSfx                       string
+	deselectSfx                     string
+	position                        image.Point
+	idlePlayLengthMs                int
+	forwardWalkPlayLengthMs         int
+	backWalkPlayLengthMs            int
+}
+
+func point(x, y int) image.Point {
+	return image.Point{X: x, Y: y}
+}
+
+func rect(x1, y1, x2, y2 int) image.Rectangle {
+	return image.Rectangle{Min: point(x1, y1), Max: point(x2, y2)}
+}
+
+// animation position, selection box bound, animation play lengths in ms
+const (
+	barbPosX, barbPosY                                     = 400, 330
+	barbRectMinX, barbRectMinY, barbRectMaxX, barbRectMaxY = 364, 201, 90, 170
+	barbIdleLength, barbForwardLength, barbBackLength      = 0, 2500, 1000
+
+	sorcPosX, sorcPosY                                     = 626, 352
+	sorcRectMinX, sorcRectMinY, sorcRectMaxX, sorcRectMaxY = 580, 240, 65, 160
+	sorcIdleLength, sorcForwardLength, sorcBackLength      = 2500, 2300, 1200
+
+	necPosX, necPosY                                   = 300, 335
+	necRectMinX, necRectMinY, necRectMaxX, necRectMaxY = 265, 220, 55, 175
+	necIdleLength, necForwardLength, necBackLength     = 1200, 2000, 1500
+
+	palPosX, palPosY                                   = 521, 338
+	palRectMinX, palRectMinY, palRectMaxX, palRectMaxY = 490, 210, 65, 180
+	palIdleLength, palForwardLength, palBackLength     = 2500, 3400, 1300
+
+	amaPosX, amaPosY                                   = 100, 339
+	amaRectMinX, amaRectMinY, amaRectMaxX, amaRectMaxY = 70, 220, 55, 200
+	amaIdleLength, amaForwardLength, amaBackLength     = 2500, 2200, 1500
+
+	assPosX, assPosY                                   = 231, 365
+	assRectMinX, assRectMinY, assRectMaxX, assRectMaxY = 175, 235, 50, 180
+	assIdleLength, assForwardLength, assBackLength     = 2500, 3800, 1500
+
+	druPosX, druPosY                                   = 720, 370
+	druRectMinX, druRectMinY, druRectMaxX, druRectMaxY = 680, 220, 70, 195
+	druIdleLength, druForwardLength, druBackLength     = 1500, 4800, 1500
+
+	campfirePosX, campfirePosY = 380, 335
+)
+
+// label and button positions
+const (
+	headingX, headingY               = 400, 17
+	heroClassLabelX, heroClassLabelY = 400, 65
+	heroDescLine1X, heroDescLine1Y   = 400, 100
+	heroDescLine2X, heroDescLine2Y   = 400, 115
+	heroDescLine3X, heroDescLine3Y   = 400, 130
+	heroNameLabelX, heroNameLabelY   = 321, 475
+	expansionLabelX, expansionLabelY = 339, 526
+	hardcoreLabelX, hardcoreLabelY   = 339, 548
+
+	selHeroExitBtnX, selHeroExitBtnY = 33, 537
+	selHeroOkBtnX, selHeroOkBtnY     = 630, 537
+
+	heroNameTextBoxX, heoNameTextBoxY       = 318, 493
+	expandsionCheckboxX, expansionCheckboxY = 318, 526
+	hardcoreCheckoxX, hardcoreCheckboxY     = 318, 548
+)
+
+const heroDescCharWidth = 37
+
+//nolint:funlen // this func returns a map of structs and the structs are big, deal with it
+func getHeroRenderConfiguration() map[d2enum.Hero]*heroRenderConfig {
+	configs := make(map[d2enum.Hero]*heroRenderConfig)
+
+	configs[d2enum.HeroBarbarian] = &heroRenderConfig{
+		d2resource.CharacterSelectBarbarianUnselected,
+		d2resource.CharacterSelectBarbarianUnselectedH,
+		d2resource.CharacterSelectBarbarianForwardWalk,
+		d2resource.CharacterSelectBarbarianForwardWalkOverlay,
+		false,
+		d2resource.CharacterSelectBarbarianSelected,
+		"",
+		d2resource.CharacterSelectBarbarianBackWalk,
+		"",
+		rect(barbRectMinX, barbRectMinY, barbRectMaxX, barbRectMaxY),
+		d2resource.SFXBarbarianSelect,
+		d2resource.SFXBarbarianDeselect,
+		point(barbPosX, barbPosY),
+		barbIdleLength,
+		barbForwardLength,
+		barbBackLength,
+	}
+
+	configs[d2enum.HeroSorceress] = &heroRenderConfig{
+		d2resource.CharacterSelectSorceressUnselected,
+		d2resource.CharacterSelectSorceressUnselectedH,
+		d2resource.CharacterSelectSorceressForwardWalk,
+		d2resource.CharacterSelectSorceressForwardWalkOverlay,
+		true,
+		d2resource.CharacterSelectSorceressSelected,
+		d2resource.CharacterSelectSorceressSelectedOverlay,
+		d2resource.CharacterSelectSorceressBackWalk,
+		d2resource.CharacterSelectSorceressBackWalkOverlay,
+		rect(sorcRectMinX, sorcRectMinY, sorcRectMaxX, sorcRectMaxY),
+		d2resource.SFXSorceressSelect,
+		d2resource.SFXSorceressDeselect,
+		point(sorcPosX, sorcPosY),
+		sorcIdleLength,
+		sorcForwardLength,
+		sorcBackLength,
+	}
+
+	configs[d2enum.HeroNecromancer] = &heroRenderConfig{
+		d2resource.CharacterSelectNecromancerUnselected,
+		d2resource.CharacterSelectNecromancerUnselectedH,
+		d2resource.CharacterSelectNecromancerForwardWalk,
+		d2resource.CharacterSelectNecromancerForwardWalkOverlay,
+		true,
+		d2resource.CharacterSelectNecromancerSelected,
+		d2resource.CharacterSelectNecromancerSelectedOverlay,
+		d2resource.CharacterSelectNecromancerBackWalk,
+		d2resource.CharacterSelectNecromancerBackWalkOverlay,
+		rect(necRectMinX, necRectMinY, necRectMaxX, necRectMaxY),
+		d2resource.SFXNecromancerSelect,
+		d2resource.SFXNecromancerDeselect,
+		point(necPosX, necPosY),
+		necIdleLength,
+		necForwardLength,
+		necBackLength,
+	}
+
+	configs[d2enum.HeroPaladin] = &heroRenderConfig{
+		d2resource.CharacterSelectPaladinUnselected,
+		d2resource.CharacterSelectPaladinUnselectedH,
+		d2resource.CharacterSelectPaladinForwardWalk,
+		d2resource.CharacterSelectPaladinForwardWalkOverlay,
+		false,
+		d2resource.CharacterSelectPaladinSelected,
+		"",
+		d2resource.CharacterSelectPaladinBackWalk,
+		"",
+		rect(palRectMinX, palRectMinY, palRectMaxX, palRectMaxY),
+		d2resource.SFXPaladinSelect,
+		d2resource.SFXPaladinDeselect,
+		point(palPosX, palPosY),
+		palIdleLength,
+		palForwardLength,
+		palBackLength,
+	}
+
+	configs[d2enum.HeroAmazon] = &heroRenderConfig{
+		d2resource.CharacterSelectAmazonUnselected,
+		d2resource.CharacterSelectAmazonUnselectedH,
+		d2resource.CharacterSelectAmazonForwardWalk,
+		"",
+		false,
+		d2resource.CharacterSelectAmazonSelected,
+		"",
+		d2resource.CharacterSelectAmazonBackWalk,
+		"",
+		rect(amaRectMinX, amaRectMinY, amaRectMaxX, amaRectMaxY),
+		d2resource.SFXAmazonSelect,
+		d2resource.SFXAmazonDeselect,
+		point(amaPosX, amaPosY),
+		amaIdleLength,
+		amaForwardLength,
+		amaBackLength,
+	}
+
+	configs[d2enum.HeroAssassin] = &heroRenderConfig{
+		d2resource.CharacterSelectAssassinUnselected,
+		d2resource.CharacterSelectAssassinUnselectedH,
+		d2resource.CharacterSelectAssassinForwardWalk,
+		"",
+		false,
+		d2resource.CharacterSelectAssassinSelected,
+		"",
+		d2resource.CharacterSelectAssassinBackWalk,
+		"",
+		rect(assRectMinX, assRectMinY, assRectMaxX, assRectMaxY),
+		d2resource.SFXAssassinSelect,
+		d2resource.SFXAssassinDeselect,
+		point(assPosX, assPosY),
+		assIdleLength,
+		assForwardLength,
+		assBackLength,
+	}
+
+	configs[d2enum.HeroDruid] = &heroRenderConfig{
+		d2resource.CharacterSelectDruidUnselected,
+		d2resource.CharacterSelectDruidUnselectedH,
+		d2resource.CharacterSelectDruidForwardWalk,
+		"",
+		false,
+		d2resource.CharacterSelectDruidSelected,
+		"",
+		d2resource.CharacterSelectDruidBackWalk,
+		"",
+		rect(druRectMinX, druRectMinY, druRectMaxX, druRectMaxY),
+		d2resource.SFXDruidSelect,
+		d2resource.SFXDruidDeselect,
+		point(druPosX, druPosY),
+		druIdleLength,
+		druForwardLength,
+		druBackLength,
+	}
+
+	return configs
+}
+
+// HeroRenderInfo stores the rendering information of a hero for the Select Hero Class screen
 type HeroRenderInfo struct {
 	Stance                   d2enum.HeroStance
 	IdleSprite               *d2ui.Sprite
@@ -36,7 +254,7 @@ type HeroRenderInfo struct {
 	DeselectSfx              d2interface.SoundEffect
 }
 
-func (hri *HeroRenderInfo) Advance(elapsed float64) {
+func (hri *HeroRenderInfo) advance(elapsed float64) {
 	advanceSprite(hri.IdleSprite, elapsed)
 	advanceSprite(hri.IdleSelectedSprite, elapsed)
 	advanceSprite(hri.ForwardWalkSprite, elapsed)
@@ -47,6 +265,7 @@ func (hri *HeroRenderInfo) Advance(elapsed float64) {
 	advanceSprite(hri.BackWalkSpriteOverlay, elapsed)
 }
 
+// SelectHeroClass represents the Select Hero Class screen
 type SelectHeroClass struct {
 	bgImage            *d2ui.Sprite
 	campfire           *d2ui.Sprite
@@ -67,17 +286,19 @@ type SelectHeroClass struct {
 	hardcoreCharLabel  d2ui.Label
 	connectionType     d2clientconnectiontype.ClientConnectionType
 	connectionHost     string
-	audioProvider      d2interface.AudioProvider
-	terminal           d2interface.Terminal
-	renderer           d2interface.Renderer
+
+	audioProvider d2interface.AudioProvider
+	renderer      d2interface.Renderer
+	navigator     Navigator
 }
 
+// CreateSelectHeroClass creates an instance of a SelectHeroClass
 func CreateSelectHeroClass(
+	navigator Navigator,
 	renderer d2interface.Renderer,
 	audioProvider d2interface.AudioProvider,
 	connectionType d2clientconnectiontype.ClientConnectionType,
 	connectionHost string,
-	terminal d2interface.Terminal,
 ) *SelectHeroClass {
 	result := &SelectHeroClass{
 		heroRenderInfo: make(map[d2enum.Hero]*HeroRenderInfo),
@@ -85,379 +306,177 @@ func CreateSelectHeroClass(
 		connectionType: connectionType,
 		connectionHost: connectionHost,
 		audioProvider:  audioProvider,
-		terminal:       terminal,
 		renderer:       renderer,
+		navigator:      navigator,
 	}
 
 	return result
 }
 
+// OnLoad loads the resources for the Select Hero Class screen
 func (v *SelectHeroClass) OnLoad(loading d2screen.LoadingState) {
 	v.audioProvider.PlayBGM(d2resource.BGMTitle)
-	loading.Progress(0.1)
+	loading.Progress(tenPercent)
 
-	v.bgImage = loadSprite(d2resource.CharacterSelectBackground, d2resource.PaletteFechar)
-	v.bgImage.SetPosition(0, 0)
+	v.bgImage = loadSprite(
+		d2resource.CharacterSelectBackground,
+		point(0, 0),
+		0,
+		true,
+		false,
+	)
 
-	v.headingLabel = d2ui.CreateLabel(v.renderer, d2resource.Font30, d2resource.PaletteUnits)
+	loading.Progress(thirtyPercent)
+
+	v.createLabels()
+	loading.Progress(fourtyPercent)
+	v.createButtons()
+
+	v.campfire = loadSprite(
+		d2resource.CharacterSelectCampfire,
+		point(campfirePosX, campfirePosY),
+		0,
+		true,
+		true,
+	)
+
+	v.createCheckboxes(v.renderer)
+	loading.Progress(fiftyPercent)
+
+	for hero, config := range getHeroRenderConfiguration() {
+		position := config.position
+		forwardWalkOverlaySprite := loadSprite(
+			config.forwardWalkOverlayAnimationPath,
+			position,
+			config.forwardWalkPlayLengthMs,
+			false,
+			config.forwardWalkOverlayBlend,
+		)
+		v.heroRenderInfo[hero] = &HeroRenderInfo{
+			Stance:                   d2enum.HeroStanceIdle,
+			IdleSprite:               loadSprite(config.idleAnimationPath, position, config.idlePlayLengthMs, true, false),
+			IdleSelectedSprite:       loadSprite(config.idleSelectedAnimationPath, position, config.idlePlayLengthMs, true, false),
+			ForwardWalkSprite:        loadSprite(config.forwardWalkAnimationPath, position, config.forwardWalkPlayLengthMs, false, false),
+			ForwardWalkSpriteOverlay: forwardWalkOverlaySprite,
+			SelectedSprite:           loadSprite(config.selectedAnimationPath, position, config.idlePlayLengthMs, true, false),
+			SelectedSpriteOverlay:    loadSprite(config.selectedOverlayAnimationPath, position, config.idlePlayLengthMs, true, true),
+			BackWalkSprite:           loadSprite(config.backWalkAnimationPath, position, config.backWalkPlayLengthMs, false, false),
+			BackWalkSpriteOverlay:    loadSprite(config.backWalkOverlayAnimationPath, position, config.backWalkPlayLengthMs, false, true),
+			SelectionBounds:          config.selectionBounds,
+			SelectSfx:                v.loadSoundEffect(config.selectSfx),
+			DeselectSfx:              v.loadSoundEffect(config.deselectSfx),
+		}
+	}
+}
+
+func (v *SelectHeroClass) createLabels() {
+	v.headingLabel = d2ui.CreateLabel(d2resource.Font30, d2resource.PaletteUnits)
 	fontWidth, _ := v.headingLabel.GetSize()
-	v.headingLabel.SetPosition(400-fontWidth/2, 17)
+	half := 2
+	halfFontWidth := fontWidth / half
+
+	v.headingLabel.SetPosition(headingX-halfFontWidth, headingY)
 	v.headingLabel.SetText("Select Hero Class")
-	v.headingLabel.Alignment = d2ui.LabelAlignCenter
+	v.headingLabel.Alignment = d2gui.HorizontalAlignCenter
 
-	v.heroClassLabel = d2ui.CreateLabel(v.renderer, d2resource.Font30, d2resource.PaletteUnits)
-	v.heroClassLabel.Alignment = d2ui.LabelAlignCenter
-	v.heroClassLabel.SetPosition(400, 65)
+	v.heroClassLabel = d2ui.CreateLabel(d2resource.Font30, d2resource.PaletteUnits)
+	v.heroClassLabel.Alignment = d2gui.HorizontalAlignCenter
+	v.heroClassLabel.SetPosition(heroClassLabelX, heroClassLabelY)
 
-	v.heroDesc1Label = d2ui.CreateLabel(v.renderer, d2resource.Font16, d2resource.PaletteUnits)
-	v.heroDesc1Label.Alignment = d2ui.LabelAlignCenter
-	v.heroDesc1Label.SetPosition(400, 100)
-	loading.Progress(0.3)
+	v.heroDesc1Label = d2ui.CreateLabel(d2resource.Font16, d2resource.PaletteUnits)
+	v.heroDesc1Label.Alignment = d2gui.HorizontalAlignCenter
+	v.heroDesc1Label.SetPosition(heroDescLine1X, heroDescLine1Y)
 
-	v.heroDesc2Label = d2ui.CreateLabel(v.renderer, d2resource.Font16, d2resource.PaletteUnits)
-	v.heroDesc2Label.Alignment = d2ui.LabelAlignCenter
-	v.heroDesc2Label.SetPosition(400, 115)
+	v.heroDesc2Label = d2ui.CreateLabel(d2resource.Font16, d2resource.PaletteUnits)
+	v.heroDesc2Label.Alignment = d2gui.HorizontalAlignCenter
+	v.heroDesc2Label.SetPosition(heroDescLine2X, heroDescLine2Y)
 
-	v.heroDesc3Label = d2ui.CreateLabel(v.renderer, d2resource.Font16, d2resource.PaletteUnits)
-	v.heroDesc3Label.Alignment = d2ui.LabelAlignCenter
-	v.heroDesc3Label.SetPosition(400, 130)
+	v.heroDesc3Label = d2ui.CreateLabel(d2resource.Font16, d2resource.PaletteUnits)
+	v.heroDesc3Label.Alignment = d2gui.HorizontalAlignCenter
+	v.heroDesc3Label.SetPosition(heroDescLine3X, heroDescLine3Y)
 
-	v.campfire = loadSprite(d2resource.CharacterSelectCampfire, d2resource.PaletteFechar)
-	v.campfire.SetPosition(380, 335)
-	v.campfire.PlayForward()
-	v.campfire.SetBlend(true)
+	v.heroNameLabel = d2ui.CreateLabel(d2resource.Font16, d2resource.PaletteUnits)
+	v.heroNameLabel.Alignment = d2gui.HorizontalAlignLeft
+	v.heroNameLabel.Color = rgbaColor(gold)
+	v.heroNameLabel.SetText("Character Name")
+	v.heroNameLabel.SetPosition(heroNameLabelX, heroNameLabelY)
 
+	v.expansionCharLabel = d2ui.CreateLabel(d2resource.Font16, d2resource.PaletteUnits)
+	v.expansionCharLabel.Alignment = d2gui.HorizontalAlignLeft
+	v.expansionCharLabel.Color = rgbaColor(gold)
+	v.expansionCharLabel.SetText("EXPANSION CHARACTER")
+	v.expansionCharLabel.SetPosition(expansionLabelX, expansionLabelY)
+
+	v.hardcoreCharLabel = d2ui.CreateLabel(d2resource.Font16, d2resource.PaletteUnits)
+	v.hardcoreCharLabel.Alignment = d2gui.HorizontalAlignLeft
+	v.hardcoreCharLabel.Color = rgbaColor(gold)
+	v.hardcoreCharLabel.SetText("Hardcore")
+	v.hardcoreCharLabel.SetPosition(hardcoreLabelX, hardcoreLabelY)
+}
+
+func (v *SelectHeroClass) createButtons() {
 	v.exitButton = d2ui.CreateButton(v.renderer, d2ui.ButtonTypeMedium, "EXIT")
-	v.exitButton.SetPosition(33, 537)
+	v.exitButton.SetPosition(selHeroExitBtnX, selHeroExitBtnY)
 	v.exitButton.OnActivated(func() { v.onExitButtonClicked() })
 	d2ui.AddWidget(&v.exitButton)
 
 	v.okButton = d2ui.CreateButton(v.renderer, d2ui.ButtonTypeMedium, "OK")
-	v.okButton.SetPosition(630, 537)
+	v.okButton.SetPosition(selHeroOkBtnX, selHeroOkBtnY)
 	v.okButton.OnActivated(func() { v.onOkButtonClicked() })
 	v.okButton.SetVisible(false)
 	v.okButton.SetEnabled(false)
 	d2ui.AddWidget(&v.okButton)
+}
 
-	v.heroNameLabel = d2ui.CreateLabel(v.renderer, d2resource.Font16, d2resource.PaletteUnits)
-	v.heroNameLabel.Alignment = d2ui.LabelAlignLeft
-	v.heroNameLabel.Color = color.RGBA{R: 216, G: 196, B: 128, A: 255}
-	v.heroNameLabel.SetText("Character Name")
-	v.heroNameLabel.SetPosition(321, 475)
-	loading.Progress(0.4)
-
-	v.heroNameTextbox = d2ui.CreateTextbox(v.renderer)
-	v.heroNameTextbox.SetPosition(318, 493)
+func (v *SelectHeroClass) createCheckboxes(renderer d2interface.Renderer) {
+	v.heroNameTextbox = d2ui.CreateTextbox()
+	v.heroNameTextbox.SetPosition(heroNameTextBoxX, heoNameTextBoxY)
 	v.heroNameTextbox.SetVisible(false)
 	d2ui.AddWidget(&v.heroNameTextbox)
 
 	v.expansionCheckbox = d2ui.CreateCheckbox(v.renderer, true)
-	v.expansionCheckbox.SetPosition(318, 526)
+	v.expansionCheckbox.SetPosition(expandsionCheckboxX, expansionCheckboxY)
 	v.expansionCheckbox.SetVisible(false)
 	d2ui.AddWidget(&v.expansionCheckbox)
 
-	v.expansionCharLabel = d2ui.CreateLabel(v.renderer, d2resource.Font16, d2resource.PaletteUnits)
-	v.expansionCharLabel.Alignment = d2ui.LabelAlignLeft
-	v.expansionCharLabel.Color = color.RGBA{R: 216, G: 196, B: 128, A: 255}
-	v.expansionCharLabel.SetText("EXPANSION CHARACTER")
-	v.expansionCharLabel.SetPosition(339, 526)
-
-	v.hardcoreCheckbox = d2ui.CreateCheckbox(v.renderer, false)
-	v.hardcoreCheckbox.SetPosition(318, 548)
+	v.hardcoreCheckbox = d2ui.CreateCheckbox(renderer, false)
+	v.hardcoreCheckbox.SetPosition(hardcoreCheckoxX, hardcoreCheckboxY)
 	v.hardcoreCheckbox.SetVisible(false)
 	d2ui.AddWidget(&v.hardcoreCheckbox)
-
-	v.hardcoreCharLabel = d2ui.CreateLabel(v.renderer, d2resource.Font16, d2resource.PaletteUnits)
-	v.hardcoreCharLabel.Alignment = d2ui.LabelAlignLeft
-	v.hardcoreCharLabel.Color = color.RGBA{R: 216, G: 196, B: 128, A: 255}
-	v.hardcoreCharLabel.SetText("Hardcore")
-	v.hardcoreCharLabel.SetPosition(339, 548)
-	loading.Progress(0.5)
-
-	v.heroRenderInfo[d2enum.HeroBarbarian] = &HeroRenderInfo{
-		d2enum.HeroStanceIdle,
-		loadSprite(d2resource.CharacterSelectBarbarianUnselected, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectBarbarianUnselectedH, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectBarbarianForwardWalk, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectBarbarianForwardWalkOverlay, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectBarbarianSelected, d2resource.PaletteFechar),
-		nil,
-		loadSprite(d2resource.CharacterSelectBarbarianBackWalk, d2resource.PaletteFechar),
-		nil,
-		image.Rectangle{Min: image.Point{X: 364, Y: 201}, Max: image.Point{X: 90, Y: 170}},
-		v.loadSoundEffect(d2resource.SFXBarbarianSelect),
-		v.loadSoundEffect(d2resource.SFXBarbarianDeselect),
-	}
-	v.heroRenderInfo[d2enum.HeroBarbarian].IdleSprite.SetPosition(400, 330)
-	v.heroRenderInfo[d2enum.HeroBarbarian].IdleSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroBarbarian].IdleSelectedSprite.SetPosition(400, 330)
-	v.heroRenderInfo[d2enum.HeroBarbarian].IdleSelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroBarbarian].ForwardWalkSprite.SetPosition(400, 330)
-	v.heroRenderInfo[d2enum.HeroBarbarian].ForwardWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroBarbarian].ForwardWalkSprite.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroBarbarian].ForwardWalkSprite.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroBarbarian].ForwardWalkSpriteOverlay.SetPosition(400, 330)
-	v.heroRenderInfo[d2enum.HeroBarbarian].ForwardWalkSpriteOverlay.PlayForward()
-	v.heroRenderInfo[d2enum.HeroBarbarian].ForwardWalkSpriteOverlay.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroBarbarian].ForwardWalkSpriteOverlay.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroBarbarian].SelectedSprite.SetPosition(400, 330)
-	v.heroRenderInfo[d2enum.HeroBarbarian].SelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroBarbarian].BackWalkSprite.SetPosition(400, 330)
-	v.heroRenderInfo[d2enum.HeroBarbarian].BackWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroBarbarian].BackWalkSprite.SetPlayLengthMs(1000)
-	v.heroRenderInfo[d2enum.HeroBarbarian].BackWalkSprite.SetPlayLoop(false)
-
-	v.heroRenderInfo[d2enum.HeroSorceress] = &HeroRenderInfo{
-		d2enum.HeroStanceIdle,
-		loadSprite(d2resource.CharacterSelecSorceressUnselected, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecSorceressUnselectedH, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecSorceressForwardWalk, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecSorceressForwardWalkOverlay, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecSorceressSelected, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecSorceressSelectedOverlay, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecSorceressBackWalk, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecSorceressBackWalkOverlay, d2resource.PaletteFechar),
-		image.Rectangle{Min: image.Point{X: 580, Y: 240}, Max: image.Point{X: 65, Y: 160}},
-		v.loadSoundEffect(d2resource.SFXSorceressSelect),
-		v.loadSoundEffect(d2resource.SFXSorceressDeselect),
-	}
-	v.heroRenderInfo[d2enum.HeroSorceress].IdleSprite.SetPosition(626, 352)
-	v.heroRenderInfo[d2enum.HeroSorceress].IdleSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroSorceress].IdleSprite.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroSorceress].IdleSelectedSprite.SetPosition(626, 352)
-	v.heroRenderInfo[d2enum.HeroSorceress].IdleSelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroSorceress].IdleSelectedSprite.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroSorceress].ForwardWalkSprite.SetPosition(626, 352)
-	v.heroRenderInfo[d2enum.HeroSorceress].ForwardWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroSorceress].ForwardWalkSprite.SetPlayLengthMs(2300)
-	v.heroRenderInfo[d2enum.HeroSorceress].ForwardWalkSprite.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroSorceress].ForwardWalkSpriteOverlay.SetBlend(true)
-	v.heroRenderInfo[d2enum.HeroSorceress].ForwardWalkSpriteOverlay.SetPosition(626, 352)
-	v.heroRenderInfo[d2enum.HeroSorceress].ForwardWalkSpriteOverlay.PlayForward()
-	v.heroRenderInfo[d2enum.HeroSorceress].ForwardWalkSpriteOverlay.SetPlayLengthMs(2300)
-	v.heroRenderInfo[d2enum.HeroSorceress].ForwardWalkSpriteOverlay.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroSorceress].SelectedSprite.SetPosition(626, 352)
-	v.heroRenderInfo[d2enum.HeroSorceress].SelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroSorceress].SelectedSprite.SetPlayLengthMs(450)
-	v.heroRenderInfo[d2enum.HeroSorceress].SelectedSpriteOverlay.SetBlend(true)
-	v.heroRenderInfo[d2enum.HeroSorceress].SelectedSpriteOverlay.SetPosition(626, 352)
-	v.heroRenderInfo[d2enum.HeroSorceress].SelectedSpriteOverlay.PlayForward()
-	v.heroRenderInfo[d2enum.HeroSorceress].SelectedSpriteOverlay.SetPlayLengthMs(450)
-	v.heroRenderInfo[d2enum.HeroSorceress].BackWalkSprite.SetPosition(626, 352)
-	v.heroRenderInfo[d2enum.HeroSorceress].BackWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroSorceress].BackWalkSprite.SetPlayLengthMs(1200)
-	v.heroRenderInfo[d2enum.HeroSorceress].BackWalkSprite.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroSorceress].BackWalkSpriteOverlay.SetBlend(true)
-	v.heroRenderInfo[d2enum.HeroSorceress].BackWalkSpriteOverlay.SetPosition(626, 352)
-	v.heroRenderInfo[d2enum.HeroSorceress].BackWalkSpriteOverlay.PlayForward()
-	v.heroRenderInfo[d2enum.HeroSorceress].BackWalkSpriteOverlay.SetPlayLengthMs(1200)
-	v.heroRenderInfo[d2enum.HeroSorceress].BackWalkSpriteOverlay.SetPlayLoop(false)
-	loading.Progress(0.6)
-
-	v.heroRenderInfo[d2enum.HeroNecromancer] = &HeroRenderInfo{
-		d2enum.HeroStanceIdle,
-		loadSprite(d2resource.CharacterSelectNecromancerUnselected, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectNecromancerUnselectedH, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecNecromancerForwardWalk, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecNecromancerForwardWalkOverlay, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecNecromancerSelected, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecNecromancerSelectedOverlay, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecNecromancerBackWalk, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecNecromancerBackWalkOverlay, d2resource.PaletteFechar),
-		image.Rectangle{Min: image.Point{X: 265, Y: 220}, Max: image.Point{X: 55, Y: 175}},
-		v.loadSoundEffect(d2resource.SFXNecromancerSelect),
-		v.loadSoundEffect(d2resource.SFXNecromancerDeselect),
-	}
-	v.heroRenderInfo[d2enum.HeroNecromancer].IdleSprite.SetPosition(300, 335)
-	v.heroRenderInfo[d2enum.HeroNecromancer].IdleSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroNecromancer].IdleSprite.SetPlayLengthMs(1200)
-	v.heroRenderInfo[d2enum.HeroNecromancer].IdleSelectedSprite.SetPosition(300, 335)
-	v.heroRenderInfo[d2enum.HeroNecromancer].IdleSelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroNecromancer].IdleSelectedSprite.SetPlayLengthMs(1200)
-	v.heroRenderInfo[d2enum.HeroNecromancer].ForwardWalkSprite.SetPosition(300, 335)
-	v.heroRenderInfo[d2enum.HeroNecromancer].ForwardWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroNecromancer].ForwardWalkSprite.SetPlayLengthMs(2000)
-	v.heroRenderInfo[d2enum.HeroNecromancer].ForwardWalkSprite.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroNecromancer].ForwardWalkSpriteOverlay.SetBlend(true)
-	v.heroRenderInfo[d2enum.HeroNecromancer].ForwardWalkSpriteOverlay.SetPosition(300, 335)
-	v.heroRenderInfo[d2enum.HeroNecromancer].ForwardWalkSpriteOverlay.PlayForward()
-	v.heroRenderInfo[d2enum.HeroNecromancer].ForwardWalkSpriteOverlay.SetPlayLengthMs(2000)
-	v.heroRenderInfo[d2enum.HeroNecromancer].ForwardWalkSpriteOverlay.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroNecromancer].SelectedSprite.SetPosition(300, 335)
-	v.heroRenderInfo[d2enum.HeroNecromancer].SelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroNecromancer].SelectedSpriteOverlay.SetBlend(true)
-	v.heroRenderInfo[d2enum.HeroNecromancer].SelectedSpriteOverlay.SetPosition(300, 335)
-	v.heroRenderInfo[d2enum.HeroNecromancer].SelectedSpriteOverlay.PlayForward()
-	v.heroRenderInfo[d2enum.HeroNecromancer].BackWalkSprite.SetPosition(300, 335)
-	v.heroRenderInfo[d2enum.HeroNecromancer].BackWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroNecromancer].BackWalkSprite.SetPlayLengthMs(1500)
-	v.heroRenderInfo[d2enum.HeroNecromancer].BackWalkSprite.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroNecromancer].BackWalkSpriteOverlay.SetBlend(true)
-	v.heroRenderInfo[d2enum.HeroNecromancer].BackWalkSpriteOverlay.SetPosition(300, 335)
-	v.heroRenderInfo[d2enum.HeroNecromancer].BackWalkSpriteOverlay.PlayForward()
-	v.heroRenderInfo[d2enum.HeroNecromancer].BackWalkSpriteOverlay.SetPlayLengthMs(1500)
-	v.heroRenderInfo[d2enum.HeroNecromancer].BackWalkSpriteOverlay.SetPlayLoop(false)
-
-	v.heroRenderInfo[d2enum.HeroPaladin] = &HeroRenderInfo{
-		d2enum.HeroStanceIdle,
-		loadSprite(d2resource.CharacterSelectPaladinUnselected, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectPaladinUnselectedH, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecPaladinForwardWalk, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecPaladinForwardWalkOverlay, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecPaladinSelected, d2resource.PaletteFechar),
-		nil,
-		loadSprite(d2resource.CharacterSelecPaladinBackWalk, d2resource.PaletteFechar),
-		nil,
-		image.Rectangle{Min: image.Point{X: 490, Y: 210}, Max: image.Point{X: 65, Y: 180}},
-		v.loadSoundEffect(d2resource.SFXPaladinSelect),
-		v.loadSoundEffect(d2resource.SFXPaladinDeselect),
-	}
-	v.heroRenderInfo[d2enum.HeroPaladin].IdleSprite.SetPosition(521, 338)
-	v.heroRenderInfo[d2enum.HeroPaladin].IdleSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroPaladin].IdleSprite.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroPaladin].IdleSelectedSprite.SetPosition(521, 338)
-	v.heroRenderInfo[d2enum.HeroPaladin].IdleSelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroPaladin].IdleSelectedSprite.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroPaladin].ForwardWalkSprite.SetPosition(521, 338)
-	v.heroRenderInfo[d2enum.HeroPaladin].ForwardWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroPaladin].ForwardWalkSprite.SetPlayLengthMs(3400)
-	v.heroRenderInfo[d2enum.HeroPaladin].ForwardWalkSprite.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroPaladin].ForwardWalkSpriteOverlay.SetPosition(521, 338)
-	v.heroRenderInfo[d2enum.HeroPaladin].ForwardWalkSpriteOverlay.PlayForward()
-	v.heroRenderInfo[d2enum.HeroPaladin].ForwardWalkSpriteOverlay.SetPlayLengthMs(3400)
-	v.heroRenderInfo[d2enum.HeroPaladin].ForwardWalkSpriteOverlay.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroPaladin].SelectedSprite.SetPosition(521, 338)
-	v.heroRenderInfo[d2enum.HeroPaladin].SelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroPaladin].SelectedSprite.SetPlayLengthMs(650)
-	v.heroRenderInfo[d2enum.HeroPaladin].BackWalkSprite.SetPosition(521, 338)
-	v.heroRenderInfo[d2enum.HeroPaladin].BackWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroPaladin].BackWalkSprite.SetPlayLengthMs(1300)
-	v.heroRenderInfo[d2enum.HeroPaladin].BackWalkSprite.SetPlayLoop(false)
-	loading.Progress(0.7)
-
-	v.heroRenderInfo[d2enum.HeroAmazon] = &HeroRenderInfo{
-		d2enum.HeroStanceIdle,
-		loadSprite(d2resource.CharacterSelectAmazonUnselected, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectAmazonUnselectedH, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelecAmazonForwardWalk, d2resource.PaletteFechar),
-		nil,
-		loadSprite(d2resource.CharacterSelecAmazonSelected, d2resource.PaletteFechar),
-		nil,
-		loadSprite(d2resource.CharacterSelecAmazonBackWalk, d2resource.PaletteFechar),
-		nil,
-		image.Rectangle{Min: image.Point{X: 70, Y: 220}, Max: image.Point{X: 55, Y: 200}},
-		v.loadSoundEffect(d2resource.SFXAmazonSelect),
-		v.loadSoundEffect(d2resource.SFXAmazonDeselect),
-	}
-	v.heroRenderInfo[d2enum.HeroAmazon].IdleSprite.SetPosition(100, 339)
-	v.heroRenderInfo[d2enum.HeroAmazon].IdleSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroAmazon].IdleSprite.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroAmazon].IdleSelectedSprite.SetPosition(100, 339)
-	v.heroRenderInfo[d2enum.HeroAmazon].IdleSelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroAmazon].IdleSelectedSprite.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroAmazon].ForwardWalkSprite.SetPosition(100, 339)
-	v.heroRenderInfo[d2enum.HeroAmazon].ForwardWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroAmazon].ForwardWalkSprite.SetPlayLengthMs(2200)
-	v.heroRenderInfo[d2enum.HeroAmazon].ForwardWalkSprite.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroAmazon].SelectedSprite.SetPosition(100, 339)
-	v.heroRenderInfo[d2enum.HeroAmazon].SelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroAmazon].SelectedSprite.SetPlayLengthMs(1350)
-	v.heroRenderInfo[d2enum.HeroAmazon].BackWalkSprite.SetPosition(100, 339)
-	v.heroRenderInfo[d2enum.HeroAmazon].BackWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroAmazon].BackWalkSprite.SetPlayLengthMs(1500)
-	v.heroRenderInfo[d2enum.HeroAmazon].BackWalkSprite.SetPlayLoop(false)
-
-	v.heroRenderInfo[d2enum.HeroAssassin] = &HeroRenderInfo{
-		d2enum.HeroStanceIdle,
-		loadSprite(d2resource.CharacterSelectAssassinUnselected, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectAssassinUnselectedH, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectAssassinForwardWalk, d2resource.PaletteFechar),
-		nil,
-		loadSprite(d2resource.CharacterSelectAssassinSelected, d2resource.PaletteFechar),
-		nil,
-		loadSprite(d2resource.CharacterSelectAssassinBackWalk, d2resource.PaletteFechar),
-		nil,
-		image.Rectangle{Min: image.Point{X: 175, Y: 235}, Max: image.Point{X: 50, Y: 180}},
-		v.loadSoundEffect(d2resource.SFXAssassinSelect),
-		v.loadSoundEffect(d2resource.SFXAssassinDeselect),
-	}
-	v.heroRenderInfo[d2enum.HeroAssassin].IdleSprite.SetPosition(231, 365)
-	v.heroRenderInfo[d2enum.HeroAssassin].IdleSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroAssassin].IdleSprite.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroAssassin].IdleSelectedSprite.SetPosition(231, 365)
-	v.heroRenderInfo[d2enum.HeroAssassin].IdleSelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroAssassin].IdleSelectedSprite.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroAssassin].ForwardWalkSprite.SetPosition(231, 365)
-	v.heroRenderInfo[d2enum.HeroAssassin].ForwardWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroAssassin].ForwardWalkSprite.SetPlayLengthMs(3800)
-	v.heroRenderInfo[d2enum.HeroAssassin].ForwardWalkSprite.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroAssassin].SelectedSprite.SetPosition(231, 365)
-	v.heroRenderInfo[d2enum.HeroAssassin].SelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroAssassin].SelectedSprite.SetPlayLengthMs(2500)
-	v.heroRenderInfo[d2enum.HeroAssassin].BackWalkSprite.SetPosition(231, 365)
-	v.heroRenderInfo[d2enum.HeroAssassin].BackWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroAssassin].BackWalkSprite.SetPlayLengthMs(1500)
-	v.heroRenderInfo[d2enum.HeroAssassin].BackWalkSprite.SetPlayLoop(false)
-	loading.Progress(0.8)
-
-	v.heroRenderInfo[d2enum.HeroDruid] = &HeroRenderInfo{
-		d2enum.HeroStanceIdle,
-		loadSprite(d2resource.CharacterSelectDruidUnselected, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectDruidUnselectedH, d2resource.PaletteFechar),
-		loadSprite(d2resource.CharacterSelectDruidForwardWalk, d2resource.PaletteFechar),
-		nil,
-		loadSprite(d2resource.CharacterSelectDruidSelected, d2resource.PaletteFechar),
-		nil,
-		loadSprite(d2resource.CharacterSelectDruidBackWalk, d2resource.PaletteFechar),
-		nil,
-		image.Rectangle{Min: image.Point{X: 680, Y: 220}, Max: image.Point{X: 70, Y: 195}},
-		v.loadSoundEffect(d2resource.SFXDruidSelect),
-		v.loadSoundEffect(d2resource.SFXDruidDeselect),
-	}
-	v.heroRenderInfo[d2enum.HeroDruid].IdleSprite.SetPosition(720, 370)
-	v.heroRenderInfo[d2enum.HeroDruid].IdleSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroDruid].IdleSprite.SetPlayLengthMs(1500)
-	v.heroRenderInfo[d2enum.HeroDruid].IdleSelectedSprite.SetPosition(720, 370)
-	v.heroRenderInfo[d2enum.HeroDruid].IdleSelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroDruid].IdleSelectedSprite.SetPlayLengthMs(1500)
-	v.heroRenderInfo[d2enum.HeroDruid].ForwardWalkSprite.SetPosition(720, 370)
-	v.heroRenderInfo[d2enum.HeroDruid].ForwardWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroDruid].ForwardWalkSprite.SetPlayLengthMs(4800)
-	v.heroRenderInfo[d2enum.HeroDruid].ForwardWalkSprite.SetPlayLoop(false)
-	v.heroRenderInfo[d2enum.HeroDruid].SelectedSprite.SetPosition(720, 370)
-	v.heroRenderInfo[d2enum.HeroDruid].SelectedSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroDruid].SelectedSprite.SetPlayLengthMs(1500)
-	v.heroRenderInfo[d2enum.HeroDruid].BackWalkSprite.SetPosition(720, 370)
-	v.heroRenderInfo[d2enum.HeroDruid].BackWalkSprite.PlayForward()
-	v.heroRenderInfo[d2enum.HeroDruid].BackWalkSprite.SetPlayLengthMs(1500)
-	v.heroRenderInfo[d2enum.HeroDruid].BackWalkSprite.SetPlayLoop(false)
 }
 
+// OnUnload releases the resources of the Select Hero Class screen
 func (v *SelectHeroClass) OnUnload() error {
 	for i := range v.heroRenderInfo {
 		v.heroRenderInfo[i].SelectSfx.Stop()
 		v.heroRenderInfo[i].DeselectSfx.Stop()
 	}
+
 	v.heroRenderInfo = nil
+
 	return nil
 }
 
 func (v *SelectHeroClass) onExitButtonClicked() {
-	d2screen.SetNextScreen(CreateCharacterSelect(v.renderer, v.audioProvider, v.connectionType,
-		v.connectionHost, v.terminal))
+	v.navigator.ToCharacterSelect(v.connectionType, v.connectionHost)
 }
 
 func (v *SelectHeroClass) onOkButtonClicked() {
-	gameState := d2player.CreatePlayerState(v.heroNameTextbox.GetText(), v.selectedHero,
-		d2datadict.CharStats[v.selectedHero], v.hardcoreCheckbox.GetCheckState())
-	gameClient, _ := d2client.Create(d2clientconnectiontype.Local)
-
-	_ = gameClient.Open(v.connectionHost, gameState.FilePath)
-	d2screen.SetNextScreen(CreateGame(v.renderer, v.audioProvider, gameClient, v.terminal))
+	gameState := d2player.CreatePlayerState(
+		v.heroNameTextbox.GetText(),
+		v.selectedHero,
+		d2datadict.CharStats[v.selectedHero],
+		v.hardcoreCheckbox.GetCheckState(),
+	)
+	v.navigator.ToCreateGame(gameState.FilePath, d2clientconnectiontype.Local, v.connectionHost)
 }
 
+// Render renders the Select Hero Class screen
 func (v *SelectHeroClass) Render(screen d2interface.Surface) error {
-	_ = v.bgImage.RenderSegmented(screen, 4, 3, 0)
+	if err := v.bgImage.RenderSegmented(screen, 4, 3, 0); err != nil {
+		return err
+	}
+
 	v.headingLabel.Render(screen)
 
 	if v.selectedHero != d2enum.HeroNone {
@@ -492,6 +511,7 @@ func (v *SelectHeroClass) Render(screen d2interface.Surface) error {
 	return nil
 }
 
+// Advance runs the update logic on the Select Hero Class screen
 func (v *SelectHeroClass) Advance(tickTime float64) error {
 	canSelect := true
 
@@ -500,7 +520,8 @@ func (v *SelectHeroClass) Advance(tickTime float64) error {
 	}
 
 	for infoIdx := range v.heroRenderInfo {
-		v.heroRenderInfo[infoIdx].Advance(tickTime)
+		v.heroRenderInfo[infoIdx].advance(tickTime)
+
 		if v.heroRenderInfo[infoIdx].Stance != d2enum.HeroStanceIdle &&
 			v.heroRenderInfo[infoIdx].Stance != d2enum.HeroStanceIdleSelected &&
 			v.heroRenderInfo[infoIdx].Stance != d2enum.HeroStanceSelected {
@@ -508,8 +529,8 @@ func (v *SelectHeroClass) Advance(tickTime float64) error {
 		}
 	}
 
-	for heroTypeIdx := range v.heroRenderInfo {
-		v.updateHeroSelectionHover(heroTypeIdx, canSelect)
+	for heroType := range v.heroRenderInfo {
+		v.updateHeroSelectionHover(heroType, canSelect)
 	}
 
 	v.okButton.SetEnabled(len(v.heroNameTextbox.GetText()) >= 2 && v.selectedHero != d2enum.HeroNone)
@@ -526,64 +547,80 @@ func (v *SelectHeroClass) updateHeroSelectionHover(hero d2enum.Hero, canSelect b
 			setSpriteToFirstFrame(renderInfo.SelectedSprite)
 			setSpriteToFirstFrame(renderInfo.SelectedSpriteOverlay)
 		}
+
 		return
 	case d2enum.HeroStanceRetreating:
 		if renderInfo.BackWalkSprite.IsOnLastFrame() {
 			renderInfo.Stance = d2enum.HeroStanceIdle
 			setSpriteToFirstFrame(renderInfo.IdleSprite)
 		}
+
 		return
 	}
-	if !canSelect {
+
+	if !canSelect || renderInfo.Stance == d2enum.HeroStanceSelected {
 		return
 	}
-	if renderInfo.Stance == d2enum.HeroStanceSelected {
-		return
-	}
+
 	mouseX, mouseY := d2ui.CursorPosition()
 	b := renderInfo.SelectionBounds
 	mouseHover := (mouseX >= b.Min.X) && (mouseX <= b.Min.X+b.Max.X) && (mouseY >= b.Min.Y) && (mouseY <= b.Min.Y+b.Max.Y)
-	if mouseHover && d2ui.CursorButtonPressed(d2ui.CursorButtonLeft) {
-		v.heroNameTextbox.SetVisible(true)
-		v.heroNameTextbox.Activate()
-		v.okButton.SetVisible(true)
-		v.expansionCheckbox.SetVisible(true)
-		v.hardcoreCheckbox.SetVisible(true)
-		renderInfo.Stance = d2enum.HeroStanceApproaching
-		setSpriteToFirstFrame(renderInfo.ForwardWalkSprite)
-		setSpriteToFirstFrame(renderInfo.ForwardWalkSpriteOverlay)
-		for _, heroInfo := range v.heroRenderInfo {
-			if heroInfo.Stance != d2enum.HeroStanceSelected {
-				continue
-			}
-			heroInfo.SelectSfx.Stop()
-			heroInfo.DeselectSfx.Play()
-			heroInfo.Stance = d2enum.HeroStanceRetreating
-			setSpriteToFirstFrame(heroInfo.BackWalkSprite)
-			setSpriteToFirstFrame(heroInfo.BackWalkSpriteOverlay)
-		}
-		v.selectedHero = hero
-		v.updateHeroText()
-		renderInfo.SelectSfx.Play()
 
+	if mouseHover && d2ui.CursorButtonPressed(d2ui.CursorButtonLeft) {
+		v.handleCursorButtonPress(hero, renderInfo)
 		return
 	}
 
-	if mouseHover && renderInfo.Stance != d2enum.HeroStanceIdleSelected {
-		_ = renderInfo.IdleSelectedSprite.SetCurrentFrame(renderInfo.IdleSprite.GetCurrentFrame())
-
-		renderInfo.Stance = d2enum.HeroStanceIdleSelected
-	} else if !mouseHover && renderInfo.Stance != d2enum.HeroStanceIdle {
-		_ = renderInfo.IdleSprite.SetCurrentFrame(renderInfo.IdleSelectedSprite.GetCurrentFrame())
-
-		renderInfo.Stance = d2enum.HeroStanceIdle
-	}
+	v.setCurrentFrame(mouseHover, renderInfo)
 
 	if v.selectedHero == d2enum.HeroNone && mouseHover {
 		v.selectedHero = hero
 		v.updateHeroText()
 	}
+}
 
+func (v *SelectHeroClass) handleCursorButtonPress(hero d2enum.Hero, renderInfo *HeroRenderInfo) {
+	v.heroNameTextbox.SetVisible(true)
+	v.heroNameTextbox.Activate()
+	v.okButton.SetVisible(true)
+	v.expansionCheckbox.SetVisible(true)
+	v.hardcoreCheckbox.SetVisible(true)
+
+	renderInfo.Stance = d2enum.HeroStanceApproaching
+	setSpriteToFirstFrame(renderInfo.ForwardWalkSprite)
+	setSpriteToFirstFrame(renderInfo.ForwardWalkSpriteOverlay)
+
+	for _, heroInfo := range v.heroRenderInfo {
+		if heroInfo.Stance != d2enum.HeroStanceSelected {
+			continue
+		}
+
+		heroInfo.SelectSfx.Stop()
+		heroInfo.DeselectSfx.Play()
+		heroInfo.Stance = d2enum.HeroStanceRetreating
+		setSpriteToFirstFrame(heroInfo.BackWalkSprite)
+		setSpriteToFirstFrame(heroInfo.BackWalkSpriteOverlay)
+	}
+
+	v.selectedHero = hero
+	v.updateHeroText()
+	renderInfo.SelectSfx.Play()
+}
+
+func (v *SelectHeroClass) setCurrentFrame(mouseHover bool, renderInfo *HeroRenderInfo) {
+	if mouseHover && renderInfo.Stance != d2enum.HeroStanceIdleSelected {
+		if err := renderInfo.IdleSelectedSprite.SetCurrentFrame(renderInfo.IdleSprite.GetCurrentFrame()); err != nil {
+			fmt.Printf("could not set current frame to: %d\n", renderInfo.IdleSprite.GetCurrentFrame())
+		}
+
+		renderInfo.Stance = d2enum.HeroStanceIdleSelected
+	} else if !mouseHover && renderInfo.Stance != d2enum.HeroStanceIdle {
+		if err := renderInfo.IdleSprite.SetCurrentFrame(renderInfo.IdleSelectedSprite.GetCurrentFrame()); err != nil {
+			fmt.Printf("could not set current frame to: %d\n", renderInfo.IdleSelectedSprite.GetCurrentFrame())
+		}
+
+		renderInfo.Stance = d2enum.HeroStanceIdle
+	}
 }
 
 func (v *SelectHeroClass) renderHero(screen d2interface.Surface, hero d2enum.Hero) {
@@ -632,36 +669,28 @@ func (v *SelectHeroClass) updateHeroText() {
 		v.heroClassLabel.SetText(d2common.TranslateString("partychardru"))
 		v.setDescLabels("Commanding the forces of nature, he summons wild beasts and raging storms to his side.")
 	}
-	/*
-	   if (selectedHero == null)
-	                   return;
-
-	               switch (selectedHero.Value)
-	               {
-
-	               }
-
-	               heroClassLabel.Location = new Point(400 - (heroClassLabel.TextArea.Width / 2), 65);
-	               heroDesc1Label.Location = new Point(400 - (heroDesc1Label.TextArea.Width / 2), 100);
-	               heroDesc2Label.Location = new Point(400 - (heroDesc2Label.TextArea.Width / 2), 115);
-	               heroDesc3Label.Location = new Point(400 - (heroDesc3Label.TextArea.Width / 2), 130);
-	*/
 }
+
+const (
+	oneLine = 1
+	twoLine = 2
+)
 
 func (v *SelectHeroClass) setDescLabels(descKey string) {
 	heroDesc := d2common.TranslateString(descKey)
-	parts := d2common.SplitIntoLinesWithMaxWidth(heroDesc, 37)
-	if len(parts) > 1 {
+	parts := d2common.SplitIntoLinesWithMaxWidth(heroDesc, heroDescCharWidth)
+
+	numLines := len(parts)
+
+	if numLines > oneLine {
 		v.heroDesc1Label.SetText(parts[0])
-	} else {
-		v.heroDesc1Label.SetText("")
-	}
-	if len(parts) > 1 {
 		v.heroDesc2Label.SetText(parts[1])
 	} else {
+		v.heroDesc1Label.SetText("")
 		v.heroDesc2Label.SetText("")
 	}
-	if len(parts) > 2 {
+
+	if numLines > twoLine {
 		v.heroDesc3Label.SetText(parts[2])
 	} else {
 		v.heroDesc3Label.SetText("")
@@ -676,19 +705,52 @@ func setSpriteToFirstFrame(sprite *d2ui.Sprite) {
 
 func drawSprite(sprite *d2ui.Sprite, target d2interface.Surface) {
 	if sprite != nil {
-		_ = sprite.Render(target)
+		if err := sprite.Render(target); err != nil {
+			x, y := sprite.GetPosition()
+			fmt.Printf("could not render the sprite to the position(x: %d, y: %d)\n", x, y)
+		}
 	}
 }
 
 func advanceSprite(sprite *d2ui.Sprite, elapsed float64) {
 	if sprite != nil {
-		_ = sprite.Advance(elapsed)
+		if err := sprite.Advance(elapsed); err != nil {
+			fmt.Printf("could not advance the sprite\n")
+		}
 	}
 }
 
-func loadSprite(animationPath, palettePath string) *d2ui.Sprite {
-	animation, _ := d2asset.LoadAnimation(animationPath, palettePath)
-	sprite, _ := d2ui.LoadSprite(animation)
+func loadSprite(animationPath string, position image.Point, playLength int, playLoop,
+	blend bool) *d2ui.Sprite {
+	if animationPath == "" {
+		return nil
+	}
+
+	animation, err := d2asset.LoadAnimation(animationPath, d2resource.PaletteFechar)
+	if err != nil {
+		fmt.Printf("could not load animation: %s\n", animationPath)
+		return nil
+	}
+
+	animation.PlayForward()
+	animation.SetPlayLoop(playLoop)
+
+	if blend {
+		animation.SetEffect(d2enum.DrawEffectModulate)
+	}
+
+	if playLength != 0 {
+		animation.SetPlayLengthMs(playLength)
+	}
+
+	sprite, err := d2ui.LoadSprite(animation)
+	if err != nil {
+		fmt.Printf("could not load sprite for the animation: %s\n", animationPath)
+		return nil
+	}
+
+	sprite.SetPosition(position.X, position.Y)
+
 	return sprite
 }
 

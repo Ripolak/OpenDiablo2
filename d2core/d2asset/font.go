@@ -6,10 +6,11 @@ import (
 	"image/color"
 	"strings"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
-
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 )
+
+var _ d2interface.Font = &Font{} // Static check to confirm struct conforms to interface
 
 type fontGlyph struct {
 	frame  int
@@ -19,12 +20,12 @@ type fontGlyph struct {
 
 // Font represents a displayable font
 type Font struct {
-	sheet  *Animation
+	sheet  d2interface.Animation
 	glyphs map[rune]fontGlyph
 	color  color.Color
 }
 
-func loadFont(tablePath, spritePath, palettePath string) (*Font, error) {
+func loadFont(tablePath, spritePath, palettePath string) (d2interface.Font, error) {
 	sheet, err := LoadAnimation(spritePath, palettePath)
 	if err != nil {
 		return nil, err
@@ -42,6 +43,7 @@ func loadFont(tablePath, spritePath, palettePath string) (*Font, error) {
 	_, maxCharHeight := sheet.GetFrameBounds()
 
 	glyphs := make(map[rune]fontGlyph)
+
 	for i := 12; i < len(data); i += 14 {
 		code := rune(binary.LittleEndian.Uint16(data[i : i+2]))
 
@@ -62,6 +64,7 @@ func loadFont(tablePath, spritePath, palettePath string) (*Font, error) {
 	return font, nil
 }
 
+// SetColor sets the fonts color
 func (f *Font) SetColor(c color.Color) {
 	f.color = c
 }
@@ -93,19 +96,9 @@ func (f *Font) GetTextMetrics(text string) (width, height int) {
 	return totalWidth, totalHeight
 }
 
-// Clone creates a shallow copy of the Font
-func (f *Font) Clone() *Font {
-	return &Font{
-		sheet:  f.sheet,
-		glyphs: f.glyphs,
-		color:  f.color,
-	}
-}
-
-// RenderText draws a string of text in a style described by Font onto the d2interface.Surface
+// RenderText prints a text using its configured style on a Surface (multi-lines are left-aligned, use label otherwise)
 func (f *Font) RenderText(text string, target d2interface.Surface) error {
 	f.sheet.SetColorMod(f.color)
-	f.sheet.SetBlend(false)
 
 	lines := strings.Split(text, "\n")
 

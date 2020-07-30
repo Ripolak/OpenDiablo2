@@ -1,188 +1,205 @@
 package d2mapentity
 
 import (
-	"math"
-
-	"github.com/OpenDiablo2/OpenDiablo2/d2common"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2astar"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
 )
 
 // mapEntity represents an entity on the map that can be animated
 type mapEntity struct {
-	LocationX          float64
-	LocationY          float64
-	TileX, TileY       int     // Coordinates of the tile the unit is within
-	subcellX, subcellY float64 // Subcell coordinates within the current tile
-	offsetX, offsetY   int
-	TargetX            float64
-	TargetY            float64
-	Speed              float64
-	path               []d2astar.Pather
-	drawLayer          int
+	Position d2vector.Position
+	Target   d2vector.Position
+	velocity d2vector.Vector
+
+	Speed     float64
+	path      []d2vector.Position
+	drawLayer int
 
 	done        func()
 	directioner func(direction int)
 }
 
-// createMapEntity creates an instance of mapEntity
-func createMapEntity(x, y int) mapEntity {
-	locX, locY := float64(x), float64(y)
+// newMapEntity creates an instance of mapEntity
+func newMapEntity(x, y int) mapEntity {
+	pos := d2vector.NewPosition(float64(x), float64(y))
+
 	return mapEntity{
-		LocationX: locX,
-		LocationY: locY,
-		TargetX:   locX,
-		TargetY:   locY,
-		TileX:     x / 5,
-		TileY:     y / 5,
-		subcellX:  1 + math.Mod(locX, 5),
-		subcellY:  1 + math.Mod(locY, 5),
-		Speed:     6,
-		drawLayer: 0,
-		path:      []d2astar.Pather{},
+		Position: pos,
+		Target:   pos,
+		velocity: *d2vector.VectorZero(),
 	}
 }
 
+// GetLayer returns the draw layer for this entity.
 func (m *mapEntity) GetLayer() int {
 	return m.drawLayer
 }
 
-func (m *mapEntity) SetPath(path []d2astar.Pather, done func()) {
+// SetPath sets the entity movement path. done() is called when the entity reaches it's path destination. For example,
+// when the player entity reaches the point a player clicked.
+func (m *mapEntity) SetPath(path []d2vector.Position, done func()) {
 	m.path = path
 	m.done = done
+	m.nextPath()
 }
 
+// ClearPath clears the entity movement path.
 func (m *mapEntity) ClearPath() {
 	m.path = nil
 }
 
+// SetSpeed sets the entity movement speed.
 func (m *mapEntity) SetSpeed(speed float64) {
 	m.Speed = speed
 }
 
+// GetSpeed returns the entity movement speed.
 func (m *mapEntity) GetSpeed() float64 {
 	return m.Speed
 }
 
-func (m *mapEntity) getStepLength(tickTime float64) (float64, float64) {
-	length := tickTime * m.Speed
-
-	angle := 359 - d2common.GetAngleBetween(
-		m.LocationX,
-		m.LocationY,
-		m.TargetX,
-		m.TargetY,
-	)
-	radians := (math.Pi / 180.0) * float64(angle)
-	oneStepX := length * math.Cos(radians)
-	oneStepY := length * math.Sin(radians)
-	return oneStepX, oneStepY
-}
-
-func (m *mapEntity) IsAtTarget() bool {
-	return math.Abs(m.LocationX-m.TargetX) < 0.0001 && math.Abs(m.LocationY-m.TargetY) < 0.0001 && !m.HasPathFinding()
-}
-
+// Step moves the entity along it's path by one tick. If the path is complete it calls entity.done() then returns.
 func (m *mapEntity) Step(tickTime float64) {
-	if m.IsAtTarget() {
+	if m.atTarget() && !m.hasPath() {
 		if m.done != nil {
 			m.done()
 			m.done = nil
 		}
+
+		m.velocity.SetLength(0)
+
 		return
 	}
 
-	stepX, stepY := m.getStepLength(tickTime)
+	m.setVelocity(tickTime * m.Speed)
+
+	v := m.velocity.Clone() // Create a new vector
+
 	for {
-		if d2common.AlmostEqual(m.LocationX-m.TargetX, 0, 0.0001) {
-			stepX = 0
-		}
-		if d2common.AlmostEqual(m.LocationY-m.TargetY, 0, 0.0001) {
-			stepY = 0
-		}
-		m.LocationX, stepX = d2common.AdjustWithRemainder(m.LocationX, stepX, m.TargetX)
-		m.LocationY, stepY = d2common.AdjustWithRemainder(m.LocationY, stepY, m.TargetY)
+		applyVelocity(&m.Position.Vector, v, &m.Target.Vector) // Pass the new vector to the function which alters it
 
-		m.subcellX = 1 + math.Mod(m.LocationX, 5)
-		m.subcellY = 1 + math.Mod(m.LocationY, 5)
-		m.TileX = int(m.LocationX / 5)
-		m.TileY = int(m.LocationY / 5)
-
-		if d2common.AlmostEqual(m.LocationX, m.TargetX, 0.01) && d2common.AlmostEqual(m.LocationY, m.TargetY, 0.01) {
-			if len(m.path) > 0 {
-				m.SetTarget(m.path[0].(*d2common.PathTile).X*5, m.path[0].(*d2common.PathTile).Y*5, m.done)
-
-				if len(m.path) > 1 {
-					m.path = m.path[1:]
-				} else {
-					m.path = []d2astar.Pather{}
-				}
-			} else {
-				m.LocationX = m.TargetX
-				m.LocationY = m.TargetY
-				m.subcellX = 1 + math.Mod(m.LocationX, 5)
-				m.subcellY = 1 + math.Mod(m.LocationY, 5)
-				m.TileX = int(m.LocationX / 5)
-				m.TileY = int(m.LocationY / 5)
-			}
+		if m.atTarget() {
+			m.nextPath()
 		}
 
-		if stepX == 0 && stepY == 0 {
+		if v.IsZero() { // Check if the new vector is zero (keeping this as m.velocity.IsZero() would break the test (infinite loop)
 			break
 		}
-
 	}
 }
 
-func (m *mapEntity) HasPathFinding() bool {
+// atTarget returns true if the distance between entity and target is almost zero.
+func (m *mapEntity) atTarget() bool {
+	return m.Position.EqualsApprox(&m.Target.Vector)
+}
+
+// setVelocity returns a vector describing the given length and the direction to the current target.
+func (m *mapEntity) setVelocity(length float64) {
+	m.velocity.Copy(&m.Target.Vector)
+	m.velocity.Subtract(&m.Position.Vector)
+	m.velocity.SetLength(length)
+}
+
+// applyVelocity adds velocity to position. If the new position extends beyond the target: Target is set to the next
+// path node, Position is set to target and velocity is set to the over-extended length with the direction of to the
+// next node.
+func applyVelocity(position, velocity, target *d2vector.Vector) {
+	// Set velocity values to zero if almost zero
+	x, y := position.CompareApprox(target)
+	vx, vy := velocity.X(), velocity.Y()
+
+	if x == 0 {
+		vx = 0
+	}
+
+	if y == 0 {
+		vy = 0
+	}
+
+	velocity.Set(vx, vy)
+
+	dest := position.Clone()
+	dest.Add(velocity)
+
+	destDistance := position.Distance(dest)
+	targetDistance := position.Distance(target)
+
+	if destDistance > targetDistance {
+		// Destination overshot target. Set position to target and velocity to overshot amount.
+		position.Copy(target)
+		velocity.Copy(dest.Subtract(target))
+	} else {
+		// At or before target, set position to destination and velocity to zero.
+		position.Copy(dest)
+		velocity.Set(0, 0)
+	}
+}
+
+// Returns false if the path has ended.
+func (m *mapEntity) nextPath() {
+	if m.hasPath() {
+		// Set next path node
+		m.setTarget(
+			m.path[0],
+			m.done,
+		)
+
+		if len(m.path) > 1 {
+			m.path = m.path[1:]
+		} else {
+			m.path = []d2vector.Position{}
+		}
+	} else {
+		// End of path.
+		m.Position.Copy(&m.Target.Vector)
+	}
+}
+
+// hasPath returns false if the length of the entity movement path is 0.
+func (m *mapEntity) hasPath() bool {
 	return len(m.path) > 0
 }
 
-// SetTarget sets target coordinates and changes animation based on proximity and direction
-func (m *mapEntity) SetTarget(tx, ty float64, done func()) {
-	m.TargetX, m.TargetY = tx, ty
+// setTarget sets target coordinates and changes animation based on proximity and direction.
+func (m *mapEntity) setTarget(p d2vector.Position, done func()) {
+	// Set the target
+	m.Target.Copy(&p.Vector)
 	m.done = done
 
+	// Update the direction
 	if m.directioner != nil {
-		angle := 359 - d2common.GetAngleBetween(
-			m.LocationX,
-			m.LocationY,
-			tx,
-			ty,
-		)
-		m.directioner(angleToDirection(float64(angle)))
+		d := m.Position.DirectionTo(m.Target.Vector)
+
+		m.directioner(d)
+	}
+
+	// Update the velocity direction
+	if !m.velocity.IsZero() {
+		m.setVelocity(m.velocity.Length())
 	}
 }
 
-func angleToDirection(angle float64) int {
-	degreesPerDirection := 360.0 / 64.0
-	offset := 45.0 - (degreesPerDirection / 2)
-
-	newDirection := int((angle - offset) / degreesPerDirection)
-
-	if newDirection >= 64 {
-		newDirection = newDirection - 64
-	} else if newDirection < 0 {
-		newDirection = 64 + newDirection
-	}
-
-	return newDirection
+// GetPosition returns the entity's current tile position, always a whole number.
+func (m *mapEntity) GetPosition() (x, y float64) {
+	t := m.Position.Tile()
+	return t.X(), t.Y()
 }
 
-func (m *mapEntity) GetPosition() (float64, float64) {
-	return float64(m.TileX), float64(m.TileY)
+// GetPositionF returns the entity's current tile position where 0.2 is one sub tile.
+func (m *mapEntity) GetPositionF() (x, y float64) {
+	w := m.Position.World()
+	return w.X(), w.Y()
 }
 
-func (m *mapEntity) GetPositionF() (float64, float64) {
-	return float64(m.TileX) + (float64(m.subcellX) / 5.0), float64(m.TileY) + (float64(m.subcellY) / 5.0)
-}
-
+// Name returns the NPC's in-game name (e.g. "Deckard Cain") or an empty string if it does not have a name
 func (m *mapEntity) Name() string {
 	return ""
 }
 
+// Highlight is not currently implemented.
 func (m *mapEntity) Highlight() {
 }
 
+// Selectable returns true if the object can be highlighted/selected.
 func (m *mapEntity) Selectable() bool {
 	return false
 }

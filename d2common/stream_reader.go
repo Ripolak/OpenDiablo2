@@ -4,6 +4,12 @@ import (
 	"io"
 )
 
+const (
+	bytesPerInt16 = 2
+	bytesPerInt32 = 4
+	bytesPerInt64 = 8
+)
+
 // StreamReader allows you to read data from a byte array in various formats
 type StreamReader struct {
 	data     []byte
@@ -16,6 +22,7 @@ func CreateStreamReader(source []byte) *StreamReader {
 		data:     source,
 		position: 0,
 	}
+
 	return result
 }
 
@@ -33,68 +40,88 @@ func (v *StreamReader) GetSize() uint64 {
 func (v *StreamReader) GetByte() byte {
 	result := v.data[v.position]
 	v.position++
+
 	return result
 }
 
 // GetUInt16 returns a uint16 word from the stream
 func (v *StreamReader) GetUInt16() uint16 {
-	result := uint16(v.data[v.position])
-	result += uint16(v.data[v.position+1]) << 8
-	v.position += 2
+	var result uint16
+
+	for offset := uint64(0); offset < bytesPerInt16; offset++ {
+		shift := uint8(bitsPerByte * offset)
+		result += uint16(v.data[v.position+offset]) << shift
+	}
+
+	v.position += bytesPerInt16
+
 	return result
 }
 
 // GetInt16 returns a int16 word from the stream
 func (v *StreamReader) GetInt16() int16 {
-	result := (int16(v.data[v.position+1]) << uint(8)) + int16(v.data[v.position])
-	v.position += 2
+	var result int16
+
+	for offset := uint64(0); offset < bytesPerInt16; offset++ {
+		shift := uint8(bitsPerByte * offset)
+		result += int16(v.data[v.position+offset]) << shift
+	}
+
+	v.position += bytesPerInt16
+
 	return result
 }
 
+// SetPosition sets the stream position with the given position
 func (v *StreamReader) SetPosition(newPosition uint64) {
 	v.position = newPosition
 }
 
 // GetUInt32 returns a uint32 dword from the stream
 func (v *StreamReader) GetUInt32() uint32 {
-	result := (uint32(v.data[v.position+3]) << uint(24)) + (uint32(v.data[v.position+2]) << uint(16)) + (uint32(v.data[v.position+1]) << uint(8)) + uint32(v.data[v.position])
-	v.position += 4
+	var result uint32
+
+	for offset := uint64(0); offset < bytesPerInt32; offset++ {
+		shift := uint8(bitsPerByte * offset)
+		result += uint32(v.data[v.position+offset]) << shift
+	}
+
+	v.position += bytesPerInt32
+
 	return result
 }
 
 // GetInt32 returns an int32 dword from the stream
 func (v *StreamReader) GetInt32() int32 {
-	result := (int32(v.data[v.position+3]) << uint(24)) + (int32(v.data[v.position+2]) << uint(16)) + (int32(v.data[v.position+1]) << uint(8)) + int32(v.data[v.position])
-	v.position += 4
+	var result int32
+
+	for offset := uint64(0); offset < bytesPerInt32; offset++ {
+		shift := uint8(bitsPerByte * offset)
+		result += int32(v.data[v.position+offset]) << shift
+	}
+
+	v.position += bytesPerInt32
+
 	return result
 }
 
 // GetUint64 returns a uint64 qword from the stream
 func (v *StreamReader) GetUint64() uint64 {
-	result := (uint64(v.data[v.position+7]) << uint(56)) +
-		(uint64(v.data[v.position+6]) << uint(48)) +
-		(uint64(v.data[v.position+5]) << uint(40)) +
-		(uint64(v.data[v.position+4]) << uint(32)) +
-		(uint64(v.data[v.position+3]) << uint(24)) +
-		(uint64(v.data[v.position+2]) << uint(16)) +
-		(uint64(v.data[v.position+1]) << uint(8)) +
-		uint64(v.data[v.position])
-	v.position += 8
+	var result uint64
+
+	for offset := uint64(0); offset < bytesPerInt64; offset++ {
+		shift := uint8(bitsPerByte * offset)
+		result += uint64(v.data[v.position+offset]) << shift
+	}
+
+	v.position += bytesPerInt64
+
 	return result
 }
 
 // GetInt64 returns a uint64 qword from the stream
 func (v *StreamReader) GetInt64() int64 {
-	result := (uint64(v.data[v.position+7]) << uint(56)) +
-		(uint64(v.data[v.position+6]) << uint(48)) +
-		(uint64(v.data[v.position+5]) << uint(40)) +
-		(uint64(v.data[v.position+4]) << uint(32)) +
-		(uint64(v.data[v.position+3]) << uint(24)) +
-		(uint64(v.data[v.position+2]) << uint(16)) +
-		(uint64(v.data[v.position+1]) << uint(8)) +
-		uint64(v.data[v.position])
-	v.position += 8
-	return int64(result)
+	return int64(v.GetUint64())
 }
 
 // ReadByte implements io.ByteReader
@@ -106,9 +133,11 @@ func (v *StreamReader) ReadByte() (byte, error) {
 func (v *StreamReader) ReadBytes(count int) []byte {
 	result := v.data[v.position : v.position+uint64(count)]
 	v.position += uint64(count)
+
 	return result
 }
 
+// SkipBytes moves the stream position forward by the given amount
 func (v *StreamReader) SkipBytes(count int) {
 	v.position += uint64(count)
 }
@@ -116,17 +145,21 @@ func (v *StreamReader) SkipBytes(count int) {
 // Read implements io.Reader
 func (v *StreamReader) Read(p []byte) (n int, err error) {
 	streamLength := v.GetSize()
+
 	for i := 0; ; i++ {
 		if v.GetPosition() >= streamLength {
 			return i, io.EOF
 		}
+
 		if i >= len(p) {
 			return i, nil
 		}
+
 		p[i] = v.GetByte()
 	}
 }
 
-func (v *StreamReader) Eof() bool {
+// EOF returns if the stream position is reached to the end of the data, or not
+func (v *StreamReader) EOF() bool {
 	return v.position >= uint64(len(v.data))
 }

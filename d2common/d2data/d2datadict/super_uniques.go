@@ -22,7 +22,7 @@ type SuperUniqueRecord struct {
 	// Name for this SuperUnique which must be retrieved from a .TBL file
 	Name string
 
-	// the base monster type of the SuperUnique, refers to the "Key" field in monstats.go ("Id" column in the MonStats.txt)
+	// the base monster type of the SuperUnique, refers to the "Key" field in monstats.go ("ID" column in the MonStats.txt)
 	Class string
 
 	// This is the "hardcoded index".
@@ -39,7 +39,7 @@ type SuperUniqueRecord struct {
 	MonSound string
 
 	// These three fields assign special abilities so SuperUnique monsters such as "Fire Enchanted" or "Stone Skin".
-	// These fields refers to the Id's corresponding to the properties in MonUMod.txt.
+	// These fields refers to the ID's corresponding to the properties in MonUMod.txt.
 	// Here is the list of available properties.
 	// 0.  None
 	// 1.  Inits the random name seed, automatically added to monster, you don't need to add this UMod.
@@ -125,34 +125,38 @@ var SuperUniques map[string]*SuperUniqueRecord
 
 // LoadSuperUniques loads SuperUniqueRecords from superuniques.txt
 func LoadSuperUniques(file []byte) {
-	dictionary := d2common.LoadDataDictionary(string(file))
-	SuperUniques = make(map[string]*SuperUniqueRecord, len(dictionary.Data))
+	SuperUniques = make(map[string]*SuperUniqueRecord)
 
-	for idx := range dictionary.Data {
+	d := d2common.LoadDataDictionary(file)
+	for d.Next() {
 		record := &SuperUniqueRecord{
-			Key:      dictionary.GetString("Superunique", idx),
-			Name:     dictionary.GetString("Name", idx),
-			Class:    dictionary.GetString("Class", idx),
-			HcIdx:    dictionary.GetString("hcIdx", idx),
-			MonSound: dictionary.GetString("MonSound", idx),
+			Key:      d.String("Superunique"),
+			Name:     d.String("Name"),
+			Class:    d.String("Class"),
+			HcIdx:    d.String("hcIdx"),
+			MonSound: d.String("MonSound"),
 			Mod: [3]int{
-				dictionary.GetNumber("Mod1", idx),
-				dictionary.GetNumber("Mod2", idx),
-				dictionary.GetNumber("Mod3", idx),
+				d.Number("Mod1"),
+				d.Number("Mod2"),
+				d.Number("Mod3"),
 			},
-			MinGrp:                 dictionary.GetNumber("MinGrp", idx),
-			MaxGrp:                 dictionary.GetNumber("MaxGrp", idx),
-			IsExpansion:            dictionary.GetNumber("EClass", idx) == 1,
-			AutoPosition:           dictionary.GetNumber("AutoPos", idx) == 1,
-			Stacks:                 dictionary.GetNumber("Stacks", idx) == 1,
-			TreasureClassNormal:    dictionary.GetString("TC", idx),
-			TreasureClassNightmare: dictionary.GetString("TC(N)", idx),
-			TreasureClassHell:      dictionary.GetString("TC(H)", idx),
-			UTransNormal:           dictionary.GetString("Utrans", idx),
-			UTransNightmare:        dictionary.GetString("Utrans(N)", idx),
-			UTransHell:             dictionary.GetString("Utrans(H)", idx),
+			MinGrp:                 d.Number("MinGrp"),
+			MaxGrp:                 d.Number("MaxGrp"),
+			IsExpansion:            d.Bool("EClass"),
+			AutoPosition:           d.Bool("AutoPos"),
+			Stacks:                 d.Bool("Stacks"),
+			TreasureClassNormal:    d.String("TC"),
+			TreasureClassNightmare: d.String("TC(N)"),
+			TreasureClassHell:      d.String("TC(H)"),
+			UTransNormal:           d.String("Utrans"),
+			UTransNightmare:        d.String("Utrans(N)"),
+			UTransHell:             d.String("Utrans(H)"),
 		}
 		SuperUniques[record.Key] = record
+	}
+
+	if d.Err != nil {
+		panic(d.Err)
 	}
 
 	log.Printf("Loaded %d SuperUnique records", len(SuperUniques))

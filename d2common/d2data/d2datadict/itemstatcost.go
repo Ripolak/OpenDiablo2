@@ -1,10 +1,9 @@
 package d2datadict
 
 import (
-	"log"
-
 	"github.com/OpenDiablo2/OpenDiablo2/d2common"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"log"
 )
 
 // ItemStatCostRecord represents a row from itemstatcost.txt
@@ -34,9 +33,6 @@ type ItemStatCostRecord struct {
 	// stat in the file simply must have this set or else you may break the
 	// entire op stuff.
 	Stuff string
-
-	DescFn      interface{} // the sprintf func
-	DescGroupFn interface{} // group sprintf func
 
 	Index int
 
@@ -75,7 +71,7 @@ type ItemStatCostRecord struct {
 	EventFuncID2 d2enum.ItemEventFuncID
 
 	DescPriority int // determines order when displayed
-	DescFnID     d2enum.DescFuncID
+	DescFnID     int
 
 	// Controls whenever and if so in what way the stat value is shown
 	// 0 = doesn't show the value of the stat
@@ -87,7 +83,7 @@ type ItemStatCostRecord struct {
 	// group func for desc (they need to be in the same affix)
 	DescGroup       int
 	DescGroupVal    int
-	DescGroupFuncID d2enum.DescFuncID
+	DescGroupFuncID int
 
 	CallbackEnabled bool // whether callback fn is called if value changes
 	Signed          bool // whether the stat is signed
@@ -109,80 +105,93 @@ var ItemStatCosts map[string]*ItemStatCostRecord
 
 // LoadItemStatCosts loads ItemStatCostRecord's from text
 func LoadItemStatCosts(file []byte) {
-	d := d2common.LoadDataDictionary(string(file))
-	numRecords := len(d.Data)
-	ItemStatCosts = make(map[string]*ItemStatCostRecord, numRecords)
+	ItemStatCosts = make(map[string]*ItemStatCostRecord)
 
-	for idx := range d.Data {
+	d := d2common.LoadDataDictionary(file)
+	for d.Next() {
 		record := &ItemStatCostRecord{
-			Name:  d.GetString("Stat", idx),
-			Index: d.GetNumber("ID", idx),
+			Name:  d.String("Stat"),
+			Index: d.Number("ID"),
 
-			Signed:   d.GetNumber("Signed", idx) > 0,
-			KeepZero: d.GetNumber("keepzero", idx) > 0,
+			Signed:   d.Number("Signed") > 0,
+			KeepZero: d.Number("keepzero") > 0,
 
-			// Ranged:  d.GetNumber("Ranged", idx) > 0,
-			MinAccr: d.GetNumber("MinAccr", idx),
+			// Ranged:  d.Number("Ranged") > 0,
+			MinAccr: d.Number("MinAccr"),
 
-			UpdateAnimRate: d.GetNumber("UpdateAnimRate", idx) > 0,
+			UpdateAnimRate: d.Number("UpdateAnimRate") > 0,
 
-			SendOther: d.GetNumber("Send Other", idx) > 0,
-			SendBits:  d.GetNumber("Send Bits", idx),
-			SendParam: d.GetNumber("Send Param Bits", idx),
+			SendOther: d.Number("Send Other") > 0,
+			SendBits:  d.Number("Send Bits"),
+			SendParam: d.Number("Send Param Bits"),
 
-			Saved:         d.GetNumber("CSvBits", idx) > 0,
-			SavedSigned:   d.GetNumber("CSvSigned", idx) > 0,
-			SavedBits:     d.GetNumber("CSvBits", idx),
-			SaveBits:      d.GetNumber("Save Bits", idx),
-			SaveAdd:       d.GetNumber("Save Add", idx),
-			SaveParamBits: d.GetNumber("Save Param Bits", idx),
+			Saved:         d.Number("CSvBits") > 0,
+			SavedSigned:   d.Number("CSvSigned") > 0,
+			SavedBits:     d.Number("CSvBits"),
+			SaveBits:      d.Number("Save Bits"),
+			SaveAdd:       d.Number("Save Add"),
+			SaveParamBits: d.Number("Save Param Bits"),
 
-			Encode: d2enum.EncodingType(d.GetNumber("Encode", idx)),
+			Encode: d2enum.EncodingType(d.Number("Encode")),
 
-			CallbackEnabled: d.GetNumber("fCallback", idx) > 0,
+			CallbackEnabled: d.Number("fCallback") > 0,
 
-			CostAdd:      d.GetNumber("Add", idx),
-			CostMultiply: d.GetNumber("Multiply", idx),
-			ValShift:     d.GetNumber("ValShift", idx),
+			CostAdd:      d.Number("Add"),
+			CostMultiply: d.Number("Multiply"),
+			ValShift:     d.Number("ValShift"),
 
-			OperatorType: d2enum.OperatorType(d.GetNumber("op", idx)),
-			OpParam:      d.GetNumber("op param", idx),
-			OpBase:       d.GetString("op base", idx),
-			OpStat1:      d.GetString("op stat1", idx),
-			OpStat2:      d.GetString("op stat2", idx),
-			OpStat3:      d.GetString("op stat3", idx),
+			OperatorType: d2enum.OperatorType(d.Number("op")),
+			OpParam:      d.Number("op param"),
+			OpBase:       d.String("op base"),
+			OpStat1:      d.String("op stat1"),
+			OpStat2:      d.String("op stat2"),
+			OpStat3:      d.String("op stat3"),
 
-			Direct:  d.GetNumber("direct", idx) > 0,
-			MaxStat: d.GetString("maxstat", idx),
+			Direct:  d.Number("direct") > 0,
+			MaxStat: d.String("maxstat"),
 
-			ItemSpecific:  d.GetNumber("itemspecific", idx) > 0,
-			DamageRelated: d.GetNumber("damagerelated", idx) > 0,
+			ItemSpecific:  d.Number("itemspecific") > 0,
+			DamageRelated: d.Number("damagerelated") > 0,
 
-			EventID1:     d2enum.GetItemEventType(d.GetString("itemevent1", idx)),
-			EventID2:     d2enum.GetItemEventType(d.GetString("itemevent2", idx)),
-			EventFuncID1: d2enum.GetItemEventFuncID(d.GetNumber("itemeventfunc1", idx)),
-			EventFuncID2: d2enum.GetItemEventFuncID(d.GetNumber("itemeventfunc2", idx)),
+			EventID1:     d2enum.GetItemEventType(d.String("itemevent1")),
+			EventID2:     d2enum.GetItemEventType(d.String("itemevent2")),
+			EventFuncID1: d2enum.ItemEventFuncID(d.Number("itemeventfunc1")),
+			EventFuncID2: d2enum.ItemEventFuncID(d.Number("itemeventfunc2")),
 
-			DescPriority: d.GetNumber("descpriority", idx),
-			DescFnID:     d2enum.DescFuncID(d.GetNumber("descfunc", idx)),
-			DescFn:       d2enum.GetDescFunction(d2enum.DescFuncID(d.GetNumber("descfunc", idx))),
-			DescVal:      d.GetNumber("descval", idx),
-			DescStrPos:   d.GetString("descstrpos", idx),
-			DescStrNeg:   d.GetString("descstrneg", idx),
-			DescStr2:     d.GetString("descstr2", idx),
+			DescPriority: d.Number("descpriority"),
+			DescFnID:     d.Number("descfunc"),
+			// DescVal:      d.Number("descval"), // needs special handling
+			DescStrPos: d.String("descstrpos"),
+			DescStrNeg: d.String("descstrneg"),
+			DescStr2:   d.String("descstr2"),
 
-			DescGroup:       d.GetNumber("dgrp", idx),
-			DescGroupFuncID: d2enum.DescFuncID(d.GetNumber("dgrpfunc", idx)),
-			DescGroupFn:     d2enum.GetDescFunction(d2enum.DescFuncID(d.GetNumber("dgrpfunc", idx))),
-			DescGroupVal:    d.GetNumber("dgrpval", idx),
-			DescGroupStrPos: d.GetString("dgrpstrpos", idx),
-			DescGroupStrNeg: d.GetString("dgrpstrneg", idx),
-			DescGroupStr2:   d.GetString("dgrpstr2", idx),
+			DescGroup:       d.Number("dgrp"),
+			DescGroupFuncID: d.Number("dgrpfunc"),
 
-			Stuff: d.GetString("stuff", idx),
+			DescGroupVal:    d.Number("dgrpval"),
+			DescGroupStrPos: d.String("dgrpstrpos"),
+			DescGroupStrNeg: d.String("dgrpstrneg"),
+			DescGroupStr2:   d.String("dgrpstr2"),
+
+			Stuff: d.String("stuff"),
+		}
+
+		descValStr := d.String("descval")
+		switch descValStr {
+		case "2":
+			record.DescVal = 2
+		case "0":
+			record.DescVal = 0
+		default:
+			// handle empty fields, seems like they should have been 1
+			record.DescVal = 1
 		}
 
 		ItemStatCosts[record.Name] = record
+	}
+
+	if d.Err != nil {
+		panic(d.Err)
 	}
 
 	log.Printf("Loaded %d ItemStatCost records", len(ItemStatCosts))

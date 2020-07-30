@@ -12,16 +12,19 @@ type Surface interface {
 	Clear(color color.Color) error
 	DrawRect(width, height int, color color.Color)
 	DrawLine(x, y int, color color.Color)
-	DrawText(format string, params ...interface{})
+	DrawTextf(format string, params ...interface{})
 	GetSize() (width, height int)
 	GetDepth() int
 	Pop()
 	PopN(n int)
 	PushColor(color color.Color)
-	PushCompositeMode(mode d2enum.CompositeMode)
-	PushFilter(filter Filter)
+	PushEffect(effect d2enum.DrawEffect)
+	PushFilter(filter d2enum.Filter)
 	PushTranslation(x, y int)
+	PushSkew(x, y float64)
+	PushScale(x, y float64)
 	PushBrightness(brightness float64)
+	PushSaturation(saturation float64)
 	Render(surface Surface) error
 	// Renders a section of the surface enclosed by bounds
 	RenderSection(surface Surface, bound image.Rectangle) error

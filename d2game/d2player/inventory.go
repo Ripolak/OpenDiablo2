@@ -1,6 +1,7 @@
 package d2player
 
 import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2datadict"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
@@ -18,13 +19,12 @@ type Inventory struct {
 	isOpen  bool
 }
 
-func NewInventory() *Inventory {
-	originX := 400
-	originY := 0
+func NewInventory(record *d2datadict.InventoryRecord) *Inventory {
 	return &Inventory{
-		grid:    NewItemGrid(10, 4, originX+19, originY+320),
-		originX: originX,
-		originY: originY,
+		grid:    NewItemGrid(record),
+		originX: record.Panel.Left,
+		// originY: record.Panel.Top,
+		originY: 0, // expansion data has these all offset by +60 ...
 	}
 }
 
@@ -58,92 +58,162 @@ func (g *Inventory) Load() {
 		d2inventory.GetWeaponItemByCode("clb"),
 		// TODO: Load the player's actual items
 	}
-	g.grid.ChangeEquippedSlot(d2enum.LeftArm, d2inventory.GetWeaponItemByCode("wnd"))
-	g.grid.ChangeEquippedSlot(d2enum.RightArm, d2inventory.GetArmorItemByCode("buc"))
-	g.grid.ChangeEquippedSlot(d2enum.Head, d2inventory.GetArmorItemByCode("crn"))
-	g.grid.ChangeEquippedSlot(d2enum.Torso, d2inventory.GetArmorItemByCode("plt"))
-	g.grid.ChangeEquippedSlot(d2enum.Legs, d2inventory.GetArmorItemByCode("vbt"))
-	g.grid.ChangeEquippedSlot(d2enum.Belt, d2inventory.GetArmorItemByCode("vbl"))
-	g.grid.ChangeEquippedSlot(d2enum.Gloves, d2inventory.GetArmorItemByCode("lgl"))
-	g.grid.ChangeEquippedSlot(d2enum.LeftHand, d2inventory.GetMiscItemByCode("rin"))
-	g.grid.ChangeEquippedSlot(d2enum.RightHand, d2inventory.GetMiscItemByCode("rin"))
-	g.grid.ChangeEquippedSlot(d2enum.Neck, d2inventory.GetMiscItemByCode("amu"))
+	g.grid.ChangeEquippedSlot(d2enum.EquippedSlotLeftArm, d2inventory.GetWeaponItemByCode("wnd"))
+	g.grid.ChangeEquippedSlot(d2enum.EquippedSlotRightArm, d2inventory.GetArmorItemByCode("buc"))
+	g.grid.ChangeEquippedSlot(d2enum.EquippedSlotHead, d2inventory.GetArmorItemByCode("crn"))
+	g.grid.ChangeEquippedSlot(d2enum.EquippedSlotTorso, d2inventory.GetArmorItemByCode("plt"))
+	g.grid.ChangeEquippedSlot(d2enum.EquippedSlotLegs, d2inventory.GetArmorItemByCode("vbt"))
+	g.grid.ChangeEquippedSlot(d2enum.EquippedSlotBelt, d2inventory.GetArmorItemByCode("vbl"))
+	g.grid.ChangeEquippedSlot(d2enum.EquippedSlotGloves, d2inventory.GetArmorItemByCode("lgl"))
+	g.grid.ChangeEquippedSlot(d2enum.EquippedSlotLeftHand, d2inventory.GetMiscItemByCode("rin"))
+	g.grid.ChangeEquippedSlot(d2enum.EquippedSlotRightHand, d2inventory.GetMiscItemByCode("rin"))
+	g.grid.ChangeEquippedSlot(d2enum.EquippedSlotNeck, d2inventory.GetMiscItemByCode("amu"))
 	// TODO: Load the player's actual items
 	g.grid.Add(items...)
 }
 
-func (g *Inventory) Render(target d2interface.Surface) {
+func (g *Inventory) Render(target d2interface.Surface) error {
 	if !g.isOpen {
-		return
+		return nil
 	}
 
 	x, y := g.originX, g.originY
 
 	// Frame
 	// Top left
-	g.frame.SetCurrentFrame(5)
+	if err := g.frame.SetCurrentFrame(5); err != nil {
+		return err
+	}
+
 	w, h := g.frame.GetCurrentFrameSize()
+
 	g.frame.SetPosition(x, y+h)
-	g.frame.Render(target)
+
+	if err := g.frame.Render(target); err != nil {
+		return err
+	}
+
 	x += w
 
 	// Top right
-	g.frame.SetCurrentFrame(6)
+	if err := g.frame.SetCurrentFrame(6); err != nil {
+		return err
+	}
+
 	w, h = g.frame.GetCurrentFrameSize()
+
 	g.frame.SetPosition(x, y+h)
-	g.frame.Render(target)
+
+	if err := g.frame.Render(target); err != nil {
+		return err
+	}
+
 	x += w
 	y += h
 
 	// Right
-	g.frame.SetCurrentFrame(7)
+	if err := g.frame.SetCurrentFrame(7); err != nil {
+		return err
+	}
+
 	w, h = g.frame.GetCurrentFrameSize()
+
 	g.frame.SetPosition(x-w, y+h)
-	g.frame.Render(target)
+
+	if err := g.frame.Render(target); err != nil {
+		return err
+	}
+
 	y += h
 
 	// Bottom right
-	g.frame.SetCurrentFrame(8)
+	if err := g.frame.SetCurrentFrame(8); err != nil {
+		return err
+	}
+
 	w, h = g.frame.GetCurrentFrameSize()
+
 	g.frame.SetPosition(x-w, y+h)
-	g.frame.Render(target)
+
+	if err := g.frame.Render(target); err != nil {
+		return err
+	}
+
 	x -= w
 
 	// Bottom left
-	g.frame.SetCurrentFrame(9)
+	if err := g.frame.SetCurrentFrame(9); err != nil {
+		return err
+	}
+
 	w, h = g.frame.GetCurrentFrameSize()
+
 	g.frame.SetPosition(x-w, y+h)
-	g.frame.Render(target)
+
+	if err := g.frame.Render(target); err != nil {
+		return err
+	}
 
 	x, y = g.originX, g.originY
 	y += 64
 
 	// Panel
 	// Top left
-	g.panel.SetCurrentFrame(4)
+	if err := g.panel.SetCurrentFrame(4); err != nil {
+		return err
+	}
+
 	w, h = g.panel.GetCurrentFrameSize()
+
 	g.panel.SetPosition(x, y+h)
-	g.panel.Render(target)
+
+	if err := g.panel.Render(target); err != nil {
+		return err
+	}
+
 	x += w
 
 	// Top right
-	g.panel.SetCurrentFrame(5)
+	if err := g.panel.SetCurrentFrame(5); err != nil {
+		return err
+	}
+
 	w, h = g.panel.GetCurrentFrameSize()
+
 	g.panel.SetPosition(x, y+h)
-	g.panel.Render(target)
+
+	if err := g.panel.Render(target); err != nil {
+		return err
+	}
+
 	y += h
 
 	// Bottom right
-	g.panel.SetCurrentFrame(7)
+	if err := g.panel.SetCurrentFrame(7); err != nil {
+		return err
+	}
+
 	w, h = g.panel.GetCurrentFrameSize()
 	g.panel.SetPosition(x, y+h)
-	g.panel.Render(target)
+
+	if err := g.panel.Render(target); err != nil {
+		return err
+	}
 
 	// Bottom left
-	g.panel.SetCurrentFrame(6)
+	if err := g.panel.SetCurrentFrame(6); err != nil {
+		return err
+	}
+
 	w, h = g.panel.GetCurrentFrameSize()
+
 	g.panel.SetPosition(x-w, y+h)
-	g.panel.Render(target)
+
+	if err := g.panel.Render(target); err != nil {
+		return err
+	}
 
 	g.grid.Render(target)
+
+	return nil
 }

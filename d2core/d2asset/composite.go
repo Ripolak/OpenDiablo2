@@ -59,10 +59,20 @@ func (c *Composite) Render(target d2interface.Surface) error {
 	}
 
 	direction := d2cof.Dir64ToCof(c.direction, c.mode.cof.NumberOfDirections)
+
 	for _, layerIndex := range c.mode.cof.Priority[direction][c.mode.frameIndex] {
 		layer := c.mode.layers[layerIndex]
 		if layer != nil {
-			if err := layer.RenderFromOrigin(target); err != nil {
+			if err := layer.RenderFromOrigin(target, true); err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, layerIndex := range c.mode.cof.Priority[direction][c.mode.frameIndex] {
+		layer := c.mode.layers[layerIndex]
+		if layer != nil {
+			if err := layer.RenderFromOrigin(target, false); err != nil {
 				return err
 			}
 		}
@@ -71,9 +81,14 @@ func (c *Composite) Render(target d2interface.Surface) error {
 	return nil
 }
 
+// ObjectAnimationMode returns the object animation mode
+func (c *Composite) ObjectAnimationMode() d2enum.ObjectAnimationMode {
+	return c.mode.animationMode.(d2enum.ObjectAnimationMode)
+}
+
 // GetAnimationMode returns the animation mode the Composite should render with.
 func (c *Composite) GetAnimationMode() string {
-	return c.mode.animationMode
+	return c.mode.animationMode.String()
 }
 
 // GetWeaponClass returns the currently loaded weapon class
@@ -82,8 +97,8 @@ func (c *Composite) GetWeaponClass() string {
 }
 
 // SetMode sets the Composite's animation mode weapon class and direction
-func (c *Composite) SetMode(animationMode, weaponClass string) error {
-	if c.mode != nil && c.mode.animationMode == animationMode && c.mode.weaponClass == weaponClass {
+func (c *Composite) SetMode(animationMode animationMode, weaponClass string) error {
+	if c.mode != nil && c.mode.animationMode.String() == animationMode.String() && c.mode.weaponClass == weaponClass {
 		return nil
 	}
 
@@ -133,7 +148,9 @@ func (c *Composite) SetDirection(direction int) {
 	for layerIdx := range c.mode.layers {
 		layer := c.mode.layers[layerIdx]
 		if layer != nil {
-			layer.SetDirection(c.direction)
+			if err := layer.SetDirection(c.direction); err != nil {
+				fmt.Printf("failed to set direction of layer: %d, err: %v\n", layerIdx, err)
+			}
 		}
 	}
 }
@@ -152,19 +169,55 @@ func (c *Composite) GetPlayedCount() int {
 	return c.mode.playedCount
 }
 
+// SetPlayLoop turns on or off animation looping
+func (c *Composite) SetPlayLoop(loop bool) {
+	for layerIdx := range c.mode.layers {
+		layer := c.mode.layers[layerIdx]
+		if layer != nil {
+			layer.SetPlayLoop(loop)
+		}
+	}
+}
+
+// SetSubLoop sets a loop to be between the specified frame indices
+func (c *Composite) SetSubLoop(startFrame, endFrame int) {
+	for layerIdx := range c.mode.layers {
+		layer := c.mode.layers[layerIdx]
+		if layer != nil {
+			layer.SetSubLoop(startFrame, endFrame)
+		}
+	}
+}
+
+// SetCurrentFrame sets the current frame index of the animation
+func (c *Composite) SetCurrentFrame(frame int) {
+	for layerIdx := range c.mode.layers {
+		layer := c.mode.layers[layerIdx]
+		if layer != nil {
+			if err := layer.SetCurrentFrame(frame); err != nil {
+				fmt.Printf("failed to set current frame of layer: %d, err: %v\n", layerIdx, err)
+			}
+		}
+	}
+}
+
 func (c *Composite) resetPlayedCount() {
 	if c.mode != nil {
 		c.mode.playedCount = 0
 	}
 }
 
+type animationMode interface {
+	String() string
+}
+
 type compositeMode struct {
 	cof           *d2cof.COF
-	animationMode string
+	animationMode animationMode
 	weaponClass   string
 	playedCount   int
 
-	layers []*Animation
+	layers []d2interface.Animation
 
 	frameCount     int
 	frameIndex     int
@@ -172,7 +225,7 @@ type compositeMode struct {
 	lastFrameTime  float64
 }
 
-func (c *Composite) createMode(animationMode, weaponClass string) (*compositeMode, error) {
+func (c *Composite) createMode(animationMode animationMode, weaponClass string) (*compositeMode, error) {
 	cofPath := fmt.Sprintf("%s/%s/COF/%s%s%s.COF", c.basePath, c.token, c.token, animationMode, weaponClass)
 	if exists, _ := FileExists(cofPath); !exists {
 		return nil, errors.New("composite not found")
@@ -183,7 +236,7 @@ func (c *Composite) createMode(animationMode, weaponClass string) (*compositeMod
 		return nil, err
 	}
 
-	animationKey := strings.ToLower(c.token + animationMode + weaponClass)
+	animationKey := strings.ToLower(c.token + animationMode.String() + weaponClass)
 
 	animationData := d2data.AnimationData[animationKey]
 	if len(animationData) == 0 {
@@ -194,7 +247,7 @@ func (c *Composite) createMode(animationMode, weaponClass string) (*compositeMod
 		cof:            cof,
 		animationMode:  animationMode,
 		weaponClass:    weaponClass,
-		layers:         make([]*Animation, d2enum.CompositeTypeMax),
+		layers:         make([]d2interface.Animation, d2enum.CompositeTypeMax),
 		frameCount:     animationData[0].FramesPerDirection,
 		animationSpeed: 1.0 / ((float64(animationData[0].AnimationSpeed) * 25.0) / 256.0),
 	}
@@ -205,28 +258,17 @@ func (c *Composite) createMode(animationMode, weaponClass string) (*compositeMod
 			layerValue = "lit"
 		}
 
-		blend := false
-		transparency := 255
+		drawEffect := d2enum.DrawEffectNone
 
 		if cofLayer.Transparent {
-			switch cofLayer.DrawEffect {
-			case d2enum.DrawEffectPctTransparency25:
-				transparency = 64
-			case d2enum.DrawEffectPctTransparency50:
-				transparency = 128
-			case d2enum.DrawEffectPctTransparency75:
-				transparency = 192
-			case d2enum.DrawEffectModulate:
-				blend = true
-			}
+			drawEffect = cofLayer.DrawEffect
 		}
 
-		layer, err := c.loadCompositeLayer(cofLayer.Type.String(), layerValue, animationMode,
-			cofLayer.WeaponClass.String(), c.palettePath, transparency)
+		layer, err := c.loadCompositeLayer(cofLayer.Type.String(), layerValue, animationMode.String(),
+			cofLayer.WeaponClass.String(), c.palettePath, drawEffect)
 		if err == nil {
 			layer.SetPlaySpeed(mode.animationSpeed)
 			layer.PlayForward()
-			layer.SetBlend(blend)
 
 			if err := layer.SetDirection(c.direction); err != nil {
 				return nil, err
@@ -240,7 +282,7 @@ func (c *Composite) createMode(animationMode, weaponClass string) (*compositeMod
 }
 
 func (c *Composite) loadCompositeLayer(layerKey, layerValue, animationMode, weaponClass,
-	palettePath string, transparency int) (*Animation, error) {
+	palettePath string, drawEffect d2enum.DrawEffect) (d2interface.Animation, error) {
 	animationPaths := []string{
 		fmt.Sprintf("%s/%s/%s/%s%s%s%s%s.dcc", c.basePath, c.token, layerKey, c.token, layerKey, layerValue, animationMode, weaponClass),
 		fmt.Sprintf("%s/%s/%s/%s%s%s%s%s.dc6", c.basePath, c.token, layerKey, c.token, layerKey, layerValue, animationMode, weaponClass),
@@ -248,7 +290,7 @@ func (c *Composite) loadCompositeLayer(layerKey, layerValue, animationMode, weap
 
 	for _, animationPath := range animationPaths {
 		if exists, _ := FileExists(animationPath); exists {
-			animation, err := LoadAnimationWithTransparency(animationPath, palettePath, transparency)
+			animation, err := LoadAnimationWithEffect(animationPath, palettePath, drawEffect)
 			if err == nil {
 				return animation, nil
 			}

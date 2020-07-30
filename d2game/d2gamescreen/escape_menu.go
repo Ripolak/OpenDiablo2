@@ -3,11 +3,10 @@ package d2gamescreen
 import (
 	"fmt"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
-
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2gui"
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2screen"
 )
 
 // TODO: fix pentagram
@@ -23,6 +22,7 @@ const (
 	sidePanelsSize = 80
 	pentSize       = 52
 	menuSize       = 500
+	spacerWidth    = 10
 
 	// layouts
 	noLayoutID layoutID = iota - 2
@@ -69,7 +69,7 @@ type EscapeMenu struct {
 
 	renderer      d2interface.Renderer
 	audioProvider d2interface.AudioProvider
-	terminal      d2interface.Terminal
+	navigator     Navigator
 }
 
 type layout struct {
@@ -123,11 +123,11 @@ type actionableElement interface {
 }
 
 // NewEscapeMenu creates a new escape menu
-func NewEscapeMenu(renderer d2interface.Renderer, audioProvider d2interface.AudioProvider, term d2interface.Terminal) *EscapeMenu {
+func NewEscapeMenu(navigator Navigator, renderer d2interface.Renderer, audioProvider d2interface.AudioProvider) *EscapeMenu {
 	m := &EscapeMenu{
 		audioProvider: audioProvider,
-		terminal:      term,
 		renderer:      renderer,
+		navigator:     navigator,
 	}
 
 	m.layouts = []*layout{
@@ -248,7 +248,7 @@ func (m *EscapeMenu) addTitle(l *layout, text string) {
 		fmt.Printf("could not add label: %s to the escape menu\n", text)
 	}
 
-	l.AddSpacerStatic(10, labelGutter)
+	l.AddSpacerStatic(spacerWidth, labelGutter)
 }
 
 func (m *EscapeMenu) addBigSelectionLabel(l *layout, text string, targetLayout layoutID) {
@@ -263,12 +263,12 @@ func (m *EscapeMenu) addBigSelectionLabel(l *layout, text string, targetLayout l
 	label.SetMouseEnterHandler(func(_ d2interface.MouseMoveEvent) {
 		m.onHoverElement(elID)
 	})
-	l.AddSpacerStatic(10, labelGutter)
+	l.AddSpacerStatic(spacerWidth, labelGutter)
 	l.actionableElements = append(l.actionableElements, label)
 }
 
 func (m *EscapeMenu) addPreviousMenuLabel(l *layout) {
-	l.AddSpacerStatic(10, labelGutter)
+	l.AddSpacerStatic(spacerWidth, labelGutter)
 	guiLabel, _ := l.AddLabel("PREVIOUS MENU", d2gui.FontStyle30Units)
 	label := &showLayoutLabel{Label: guiLabel, target: optionsLayoutID, showLayout: m.showLayout}
 	label.SetMouseClickHandler(func(_ d2interface.MouseEvent) {
@@ -314,7 +314,7 @@ func (m *EscapeMenu) addEnumLabel(l *layout, optID optionID, text string, values
 	layout.SetMouseClickHandler(func(_ d2interface.MouseEvent) {
 		label.Trigger()
 	})
-	l.AddSpacerStatic(10, labelGutter)
+	l.AddSpacerStatic(spacerWidth, labelGutter)
 	l.actionableElements = append(l.actionableElements, label)
 }
 
@@ -367,10 +367,7 @@ func (m *EscapeMenu) showLayout(id layoutID) {
 	}
 
 	if id == saveLayoutID {
-		mainMenu := CreateMainMenu(m.renderer, m.audioProvider, m.terminal)
-		mainMenu.setScreenMode(screenModeMainMenu)
-		d2screen.SetNextScreen(mainMenu)
-
+		m.navigator.ToMainMenu()
 		return
 	}
 
@@ -382,9 +379,9 @@ func (m *EscapeMenu) onHoverElement(id int) {
 	m.layouts[m.currentLayout].currentEl = id
 
 	x, _ := m.leftPent.GetPosition()
-	m.leftPent.SetPosition(x, y+10)
+	m.leftPent.SetPosition(x, y+spacerWidth)
 	x, _ = m.rightPent.GetPosition()
-	m.rightPent.SetPosition(x, y+10)
+	m.rightPent.SetPosition(x, y+spacerWidth)
 }
 
 func (m *EscapeMenu) onUpdateValue(optID optionID, value string) {
@@ -435,13 +432,13 @@ func (m *EscapeMenu) onEnterKey() {
 // OnKeyDown defines the actions of the Escape Menu when a key is pressed
 func (m *EscapeMenu) OnKeyDown(event d2interface.KeyEvent) bool {
 	switch event.Key() {
-	case d2interface.KeyEscape:
+	case d2enum.KeyEscape:
 		m.onEscKey()
-	case d2interface.KeyUp:
+	case d2enum.KeyUp:
 		m.onUpKey()
-	case d2interface.KeyDown:
+	case d2enum.KeyDown:
 		m.onDownKey()
-	case d2interface.KeyEnter:
+	case d2enum.KeyEnter:
 		m.onEnterKey()
 	default:
 		return false

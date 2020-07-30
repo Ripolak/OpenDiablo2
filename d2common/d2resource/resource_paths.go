@@ -1,7 +1,5 @@
 package d2resource
 
-var LanguageCode string
-
 // Paths of the resources inside the mpq files.
 const (
 	// --- Screens ---
@@ -35,37 +33,37 @@ const (
 	CharacterSelectBarbarianForwardWalkOverlay = "/data/global/ui/FrontEnd/barbarian/BAFWs.DC6"
 	CharacterSelectBarbarianBackWalk           = "/data/global/ui/FrontEnd/barbarian/babw.DC6"
 
-	CharacterSelecSorceressUnselected         = "/data/global/ui/FrontEnd/sorceress/SONU1.DC6"
-	CharacterSelecSorceressUnselectedH        = "/data/global/ui/FrontEnd/sorceress/SONU2.DC6"
-	CharacterSelecSorceressSelected           = "/data/global/ui/FrontEnd/sorceress/SONU3.DC6"
-	CharacterSelecSorceressSelectedOverlay    = "/data/global/ui/FrontEnd/sorceress/SONU3s.DC6"
-	CharacterSelecSorceressForwardWalk        = "/data/global/ui/FrontEnd/sorceress/SOFW.DC6"
-	CharacterSelecSorceressForwardWalkOverlay = "/data/global/ui/FrontEnd/sorceress/SOFWs.DC6"
-	CharacterSelecSorceressBackWalk           = "/data/global/ui/FrontEnd/sorceress/SOBW.DC6"
-	CharacterSelecSorceressBackWalkOverlay    = "/data/global/ui/FrontEnd/sorceress/SOBWs.DC6"
+	CharacterSelectSorceressUnselected         = "/data/global/ui/FrontEnd/sorceress/SONU1.DC6"
+	CharacterSelectSorceressUnselectedH        = "/data/global/ui/FrontEnd/sorceress/SONU2.DC6"
+	CharacterSelectSorceressSelected           = "/data/global/ui/FrontEnd/sorceress/SONU3.DC6"
+	CharacterSelectSorceressSelectedOverlay    = "/data/global/ui/FrontEnd/sorceress/SONU3s.DC6"
+	CharacterSelectSorceressForwardWalk        = "/data/global/ui/FrontEnd/sorceress/SOFW.DC6"
+	CharacterSelectSorceressForwardWalkOverlay = "/data/global/ui/FrontEnd/sorceress/SOFWs.DC6"
+	CharacterSelectSorceressBackWalk           = "/data/global/ui/FrontEnd/sorceress/SOBW.DC6"
+	CharacterSelectSorceressBackWalkOverlay    = "/data/global/ui/FrontEnd/sorceress/SOBWs.DC6"
 
-	CharacterSelectNecromancerUnselected        = "/data/global/ui/FrontEnd/necromancer/NENU1.DC6"
-	CharacterSelectNecromancerUnselectedH       = "/data/global/ui/FrontEnd/necromancer/NENU2.DC6"
-	CharacterSelecNecromancerSelected           = "/data/global/ui/FrontEnd/necromancer/NENU3.DC6"
-	CharacterSelecNecromancerSelectedOverlay    = "/data/global/ui/FrontEnd/necromancer/NENU3s.DC6"
-	CharacterSelecNecromancerForwardWalk        = "/data/global/ui/FrontEnd/necromancer/NEFW.DC6"
-	CharacterSelecNecromancerForwardWalkOverlay = "/data/global/ui/FrontEnd/necromancer/NEFWs.DC6"
-	CharacterSelecNecromancerBackWalk           = "/data/global/ui/FrontEnd/necromancer/NEBW.DC6"
-	CharacterSelecNecromancerBackWalkOverlay    = "/data/global/ui/FrontEnd/necromancer/NEBWs.DC6"
+	CharacterSelectNecromancerUnselected         = "/data/global/ui/FrontEnd/necromancer/NENU1.DC6"
+	CharacterSelectNecromancerUnselectedH        = "/data/global/ui/FrontEnd/necromancer/NENU2.DC6"
+	CharacterSelectNecromancerSelected           = "/data/global/ui/FrontEnd/necromancer/NENU3.DC6"
+	CharacterSelectNecromancerSelectedOverlay    = "/data/global/ui/FrontEnd/necromancer/NENU3s.DC6"
+	CharacterSelectNecromancerForwardWalk        = "/data/global/ui/FrontEnd/necromancer/NEFW.DC6"
+	CharacterSelectNecromancerForwardWalkOverlay = "/data/global/ui/FrontEnd/necromancer/NEFWs.DC6"
+	CharacterSelectNecromancerBackWalk           = "/data/global/ui/FrontEnd/necromancer/NEBW.DC6"
+	CharacterSelectNecromancerBackWalkOverlay    = "/data/global/ui/FrontEnd/necromancer/NEBWs.DC6"
 
-	CharacterSelectPaladinUnselected        = "/data/global/ui/FrontEnd/paladin/PANU1.DC6"
-	CharacterSelectPaladinUnselectedH       = "/data/global/ui/FrontEnd/paladin/PANU2.DC6"
-	CharacterSelecPaladinSelected           = "/data/global/ui/FrontEnd/paladin/PANU3.DC6"
-	CharacterSelecPaladinForwardWalk        = "/data/global/ui/FrontEnd/paladin/PAFW.DC6"
-	CharacterSelecPaladinForwardWalkOverlay = "/data/global/ui/FrontEnd/paladin/PAFWs.DC6"
-	CharacterSelecPaladinBackWalk           = "/data/global/ui/FrontEnd/paladin/PABW.DC6"
+	CharacterSelectPaladinUnselected         = "/data/global/ui/FrontEnd/paladin/PANU1.DC6"
+	CharacterSelectPaladinUnselectedH        = "/data/global/ui/FrontEnd/paladin/PANU2.DC6"
+	CharacterSelectPaladinSelected           = "/data/global/ui/FrontEnd/paladin/PANU3.DC6"
+	CharacterSelectPaladinForwardWalk        = "/data/global/ui/FrontEnd/paladin/PAFW.DC6"
+	CharacterSelectPaladinForwardWalkOverlay = "/data/global/ui/FrontEnd/paladin/PAFWs.DC6"
+	CharacterSelectPaladinBackWalk           = "/data/global/ui/FrontEnd/paladin/PABW.DC6"
 
-	CharacterSelectAmazonUnselected        = "/data/global/ui/FrontEnd/amazon/AMNU1.DC6"
-	CharacterSelectAmazonUnselectedH       = "/data/global/ui/FrontEnd/amazon/AMNU2.DC6"
-	CharacterSelecAmazonSelected           = "/data/global/ui/FrontEnd/amazon/AMNU3.DC6"
-	CharacterSelecAmazonForwardWalk        = "/data/global/ui/FrontEnd/amazon/AMFW.DC6"
-	CharacterSelecAmazonForwardWalkOverlay = "/data/global/ui/FrontEnd/amazon/AMFWs.DC6"
-	CharacterSelecAmazonBackWalk           = "/data/global/ui/FrontEnd/amazon/AMBW.DC6"
+	CharacterSelectAmazonUnselected         = "/data/global/ui/FrontEnd/amazon/AMNU1.DC6"
+	CharacterSelectAmazonUnselectedH        = "/data/global/ui/FrontEnd/amazon/AMNU2.DC6"
+	CharacterSelectAmazonSelected           = "/data/global/ui/FrontEnd/amazon/AMNU3.DC6"
+	CharacterSelectAmazonForwardWalk        = "/data/global/ui/FrontEnd/amazon/AMFW.DC6"
+	CharacterSelectAmazonForwardWalkOverlay = "/data/global/ui/FrontEnd/amazon/AMFWs.DC6"
+	CharacterSelectAmazonBackWalk           = "/data/global/ui/FrontEnd/amazon/AMBW.DC6"
 
 	CharacterSelectAssassinUnselected  = "/data/global/ui/FrontEnd/assassin/ASNU1.DC6"
 	CharacterSelectAssassinUnselectedH = "/data/global/ui/FrontEnd/assassin/ASNU2.DC6"
@@ -174,7 +172,7 @@ const (
 	LevelPreset        = "/data/global/excel/LvlPrest.txt"
 	LevelType          = "/data/global/excel/LvlTypes.txt"
 	ObjectType         = "/data/global/excel/objtype.bin"
-	LevelWarp          = "/data/global/excel/LvlWarp.bin"
+	LevelWarp          = "/data/global/excel/LvlWarp.txt"
 	LevelDetails       = "/data/global/excel/Levels.txt"
 	LevelMaze          = "/data/global/excel/LvlMaze.txt"
 	LevelSubstitutions = "/data/global/excel/LvlSub.txt"
@@ -182,10 +180,28 @@ const (
 	ObjectDetails    = "/data/global/excel/Objects.txt"
 	SoundSettings    = "/data/global/excel/Sounds.txt"
 	ItemStatCost     = "/data/global/excel/ItemStatCost.txt"
+	ItemTypes        = "/data/global/excel/ItemTypes.txt"
+	QualityItems     = "/data/global/excel/qualityitems.txt"
+	Runes            = "/data/global/excel/runes.txt"
+	Sets             = "/data/global/excel/Sets.txt"
+	SetItems         = "/data/global/excel/SetItems.txt"
+	AutoMagic        = "/data/global/excel/automagic.txt"
+	BodyLocations    = "/data/global/excel/bodylocs.txt"
+	Properties       = "/data/global/excel/Properties.txt"
 	Hireling         = "/data/global/excel/hireling.txt"
 	DifficultyLevels = "/data/global/excel/difficultylevels.txt"
 	AutoMap          = "/data/global/excel/AutoMap.txt"
 	CubeRecipes      = "/data/global/excel/cubemain.txt"
+	Skills           = "/data/global/excel/skills.txt"
+	SkillDesc        = "/data/global/excel/skilldesc.txt"
+	TreasureClass    = "/data/global/excel/TreasureClassEx.txt"
+	States           = "/data/global/excel/states.txt"
+	SoundEnvirons    = "/data/global/excel/soundenviron.txt"
+	Shrines          = "/data/global/excel/shrines.txt"
+	MonProp          = "/data/global/excel/Monprop.txt"
+	ElemType         = "/data/global/excel/ElemTypes.txt"
+	PlrMode          = "/data/global/excel/PlrMode.txt"
+	PetType          = "/data/global/excel/pettype.txt"
 
 	// --- Animations ---
 
@@ -196,8 +212,10 @@ const (
 
 	// --- Inventory Data ---
 
+	Inventory   = "/data/global/excel/inventory.txt"
 	Weapons     = "/data/global/excel/weapons.txt"
 	Armor       = "/data/global/excel/armor.txt"
+	Books       = "/data/global/excel/books.txt"
 	Misc        = "/data/global/excel/misc.txt"
 	UniqueItems = "/data/global/excel/UniqueItems.txt"
 	Gems        = "/data/global/excel/gems.txt"
@@ -257,7 +275,12 @@ const (
 	BGMAct4Mesa                 = "/data/global/music/Act4/mesa.wav"
 	BGMAct4Town4                = "/data/global/music/Act4/town4.wav"
 	BGMAct5Baal                 = "/data/global/music/Act5/baal.wav"
+	BGMAct5Siege                = "/data/global/music/Act5/siege.wav"
+	BGMAct5Shenk                = "/data/global/music/Act5/shenkmusic.wav"
 	BGMAct5XTown                = "/data/global/music/Act5/xtown.wav"
+	BGMAct5XTemple              = "/data/global/music/Act5/xtemple.wav"
+	BGMAct5IceCaves             = "/data/global/music/Act5/icecaves.wav"
+	BGMAct5Nihlathak            = "/data/global/music/Act5/nihlathakmusic.wav"
 
 	// --- Sound Effects ---
 
@@ -281,9 +304,11 @@ const (
 	// --- Enemy Data ---
 
 	MonStats     = "/data/global/excel/monstats.txt"
-	MonStats2 	 = "/data/global/excel/monstats2.txt"
+	MonStats2    = "/data/global/excel/monstats2.txt"
 	MonPreset    = "/data/global/excel/monpreset.txt"
+	MonType      = "/data/global/excel/Montype.txt"
 	SuperUniques = "/data/global/excel/SuperUniques.txt"
+	MonMode      = "/data/global/excel/monmode.txt"
 
 	// --- Skill Data ---
 

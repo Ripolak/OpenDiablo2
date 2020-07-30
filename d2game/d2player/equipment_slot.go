@@ -1,6 +1,9 @@
 package d2player
 
-import "github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+import (
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2datadict"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+)
 
 // EquipmentSlot represents an equipment slot for a player
 type EquipmentSlot struct {
@@ -11,78 +14,33 @@ type EquipmentSlot struct {
 	height int
 }
 
-//nolint:gomnd Magic numbers are necessary for this file
-func genEquipmentSlotsMap() map[d2enum.EquippedSlotType]EquipmentSlot {
-	return map[d2enum.EquippedSlotType]EquipmentSlot{
-		d2enum.LeftArm: {
-			item:   nil,
-			x:      418,
-			y:      224,
-			width:  61,
-			height: 116,
-		},
-		d2enum.RightArm: {
-			item:   nil,
-			x:      648,
-			y:      224,
-			width:  61,
-			height: 116,
-		},
-		d2enum.Head: {
-			item:   nil,
-			x:      532,
-			y:      125,
-			width:  62,
-			height: 62,
-		},
-		d2enum.Neck: {
-			item:   nil,
-			x:      604,
-			y:      125,
-			width:  32,
-			height: 32,
-		},
-		d2enum.Torso: {
-			item:   nil,
-			x:      532,
-			y:      224,
-			width:  62,
-			height: 90,
-		},
-		d2enum.Belt: {
-			item:   nil,
-			x:      533,
-			y:      269,
-			width:  62,
-			height: 32,
-		},
-		d2enum.LeftHand: {
-			item:   nil,
-			x:      491,
-			y:      270,
-			width:  32,
-			height: 32,
-		},
-		d2enum.RightHand: {
-			item:   nil,
-			x:      606,
-			y:      270,
-			width:  32,
-			height: 32,
-		},
-		d2enum.Gloves: {
-			item:   nil,
-			x:      417,
-			y:      299,
-			width:  62,
-			height: 62,
-		},
-		d2enum.Legs: {
-			item:   nil,
-			x:      648,
-			y:      299,
-			width:  62,
-			height: 62,
-		},
+func genEquipmentSlotsMap(record *d2datadict.InventoryRecord) map[d2enum.EquippedSlot]EquipmentSlot {
+	slotMap := map[d2enum.EquippedSlot]EquipmentSlot{}
+
+	slots := []d2enum.EquippedSlot{
+		d2enum.EquippedSlotHead,
+		d2enum.EquippedSlotTorso,
+		d2enum.EquippedSlotLegs,
+		d2enum.EquippedSlotRightArm,
+		d2enum.EquippedSlotLeftArm,
+		d2enum.EquippedSlotLeftHand,
+		d2enum.EquippedSlotRightHand,
+		d2enum.EquippedSlotNeck,
+		d2enum.EquippedSlotBelt,
+		d2enum.EquippedSlotGloves,
 	}
+	
+	for _, slot := range slots {
+		box := record.Slots[slot]
+		equipmentSlot := EquipmentSlot{
+			nil,
+			box.Left,
+			box.Bottom + cellPadding,
+			box.Width,
+			box.Height,
+		}
+		slotMap[slot] = equipmentSlot
+	}
+
+	return slotMap
 }

@@ -4,16 +4,32 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2datadict"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 )
 
+// Missile is a simple animated entity representing a projectile,
+// such as a spell or arrow.
 type Missile struct {
 	*AnimatedEntity
 	record *d2datadict.MissileRecord
 }
 
+// GetPosition returns the position of the missile
+func (m *Missile) GetPosition() d2vector.Position {
+	return m.AnimatedEntity.Position
+}
+
+// GetVelocity returns the velocity vector of the missile
+func (m *Missile) GetVelocity() d2vector.Vector {
+	return m.AnimatedEntity.velocity
+}
+
+// CreateMissile creates a new Missile and initializes it's animation.
 func CreateMissile(x, y int, record *d2datadict.MissileRecord) (*Missile, error) {
 	animation, err := d2asset.LoadAnimation(
 		fmt.Sprintf("%s/%s.dcc", d2resource.MissileData, record.Animation.CelFileName),
@@ -27,8 +43,7 @@ func CreateMissile(x, y int, record *d2datadict.MissileRecord) (*Missile, error)
 		animation.SetSubLoop(record.Animation.SubStartingFrame, record.Animation.SubEndingFrame)
 	}
 
-	animation.SetBlend(true)
-	//animation.SetPlaySpeed(float64(record.Animation.AnimationSpeed))
+	animation.SetEffect(d2enum.DrawEffectModulate)
 	animation.SetPlayLoop(record.Animation.LoopAnimation)
 	animation.PlayForward()
 	entity := CreateAnimatedEntity(x, y, animation)
@@ -38,18 +53,23 @@ func CreateMissile(x, y int, record *d2datadict.MissileRecord) (*Missile, error)
 		record:         record,
 	}
 	result.Speed = float64(record.Velocity)
+
 	return result, nil
 }
 
+// SetRadians adjusts the entity target based on it's range, rotating it's
+// current destination by the value of angle in radians.
 func (m *Missile) SetRadians(angle float64, done func()) {
 	r := float64(m.record.Range)
 
-	x := m.LocationX + (r * math.Cos(angle))
-	y := m.LocationY + (r * math.Sin(angle))
+	x := m.Position.X() + (r * math.Cos(angle))
+	y := m.Position.Y() + (r * math.Sin(angle))
 
-	m.SetTarget(x, y, done)
+	m.setTarget(d2vector.NewPosition(x, y), done)
 }
 
+// Advance is called once per frame and processes a
+// single game tick.
 func (m *Missile) Advance(tickTime float64) {
 	// TODO: collision detection
 	m.Step(tickTime)

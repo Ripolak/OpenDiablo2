@@ -3,10 +3,11 @@ package d2ui
 import (
 	"log"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2input"
 )
 
 // CursorButton represents a mouse button
@@ -20,24 +21,28 @@ const (
 )
 
 type UI struct {
+	inputManager  d2interface.InputManager
 	widgets       []Widget
 	cursorButtons CursorButton // TODO (carrelld) convert dependent code and remove
 	CursorX       int          // TODO (carrelld) convert dependent code and remove
 	CursorY       int          // TODO (carrelld) convert dependent code and remove
 	pressedWidget Widget
+	clickSfx      d2interface.SoundEffect
 }
 
 var singleton UI
-var clickSfx d2interface.SoundEffect
 
-func Initialize(audioProvider d2interface.AudioProvider) {
+func Initialize(inputManager d2interface.InputManager, audioProvider d2interface.AudioProvider) {
 	sfx, err := audioProvider.LoadSoundEffect(d2resource.SFXButtonClick)
 	if err != nil {
 		log.Fatalf("failed to initialize ui: %v", err)
 	}
-	clickSfx = sfx
+	singleton.clickSfx = sfx
 
-	d2input.BindHandler(&singleton)
+	singleton.inputManager = inputManager
+	if err := singleton.inputManager.BindHandler(&singleton); err != nil {
+		log.Fatalf("failed to initialize ui: %v", err)
+	}
 }
 
 // Reset resets the state of the UI manager. Typically called for new screens
@@ -48,13 +53,13 @@ func Reset() {
 
 // AddWidget adds a widget to the UI manager
 func AddWidget(widget Widget) {
-	d2input.BindHandler(widget)
+	singleton.inputManager.BindHandler(widget)
 	singleton.widgets = append(singleton.widgets, widget)
 }
 
 func (u *UI) OnMouseButtonUp(event d2interface.MouseEvent) bool {
 	singleton.CursorX, singleton.CursorY = event.X(), event.Y()
-	if event.Button() == d2interface.MouseButtonLeft {
+	if event.Button() == d2enum.MouseButtonLeft {
 		singleton.cursorButtons |= CursorButtonLeft
 		// activate previously pressed widget if cursor is still hovering
 		w := singleton.pressedWidget
@@ -71,19 +76,19 @@ func (u *UI) OnMouseButtonUp(event d2interface.MouseEvent) bool {
 
 func (u *UI) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 	singleton.CursorX, singleton.CursorY = event.X(), event.Y()
-	if event.Button() == d2interface.MouseButtonLeft {
+	if event.Button() == d2enum.MouseButtonLeft {
 		// find and press a widget on screen
 		singleton.pressedWidget = nil
 		for _, w := range singleton.widgets {
 			if contains(w, singleton.CursorX, singleton.CursorY) && w.GetVisible() && w.GetEnabled() {
 				w.SetPressed(true)
 				singleton.pressedWidget = w
-				clickSfx.Play()
+				u.clickSfx.Play()
 				break
 			}
 		}
 	}
-	if event.Button() == d2interface.MouseButtonRight {
+	if event.Button() == d2enum.MouseButtonRight {
 		singleton.cursorButtons |= CursorButtonRight
 	}
 	return false

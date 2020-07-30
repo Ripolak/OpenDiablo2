@@ -3,7 +3,9 @@ package d2input
 import (
 	"sort"
 
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	ebiten_input "github.com/OpenDiablo2/OpenDiablo2/d2core/d2input/ebiten"
 )
 
 type inputManager struct {
@@ -11,10 +13,16 @@ type inputManager struct {
 	cursorX      int
 	cursorY      int
 
-	buttonMod d2interface.MouseButtonMod
-	keyMod    d2interface.KeyMod
+	buttonMod d2enum.MouseButtonMod
+	keyMod    d2enum.KeyMod
 
 	entries handlerEntryList
+}
+
+func New() d2interface.InputManager {
+	return &inputManager{
+		inputService: ebiten_input.InputService{},
+	}
 }
 
 // Advance advances the inputManager
@@ -30,7 +38,7 @@ func (im *inputManager) Advance(_, _ float64) error {
 		cursorY,
 	}
 
-	for key := d2interface.KeyMin; key <= d2interface.KeyMax; key++ {
+	for key := d2enum.KeyMin; key <= d2enum.KeyMax; key++ {
 		im.updateJustPressedKey(key, eventBase)
 		im.updateJustReleasedKey(key, eventBase)
 		im.updatePressedKey(key, eventBase)
@@ -38,7 +46,7 @@ func (im *inputManager) Advance(_, _ float64) error {
 
 	im.updateInputChars(eventBase)
 
-	for button := d2interface.MouseButtonMin; button <= d2interface.MouseButtonMax; button++ {
+	for button := d2enum.MouseButtonMin; button <= d2enum.MouseButtonMax; button++ {
 		im.updateJustPressedButton(button, eventBase)
 		im.updateJustReleasedButton(button, eventBase)
 		im.updatePressedButton(button, eventBase)
@@ -51,35 +59,35 @@ func (im *inputManager) Advance(_, _ float64) error {
 
 func (im *inputManager) updateKeyMod() {
 	im.keyMod = 0
-	if im.inputService.IsKeyPressed(d2interface.KeyAlt) {
-		im.keyMod |= d2interface.KeyModAlt
+	if im.inputService.IsKeyPressed(d2enum.KeyAlt) {
+		im.keyMod |= d2enum.KeyModAlt
 	}
 
-	if im.inputService.IsKeyPressed(d2interface.KeyControl) {
-		im.keyMod |= d2interface.KeyModControl
+	if im.inputService.IsKeyPressed(d2enum.KeyControl) {
+		im.keyMod |= d2enum.KeyModControl
 	}
 
-	if im.inputService.IsKeyPressed(d2interface.KeyShift) {
-		im.keyMod |= d2interface.KeyModShift
+	if im.inputService.IsKeyPressed(d2enum.KeyShift) {
+		im.keyMod |= d2enum.KeyModShift
 	}
 }
 
 func (im *inputManager) updateButtonMod() {
 	im.buttonMod = 0
-	if im.inputService.IsMouseButtonPressed(d2interface.MouseButtonLeft) {
-		im.buttonMod |= d2interface.MouseButtonModLeft
+	if im.inputService.IsMouseButtonPressed(d2enum.MouseButtonLeft) {
+		im.buttonMod |= d2enum.MouseButtonModLeft
 	}
 
-	if im.inputService.IsMouseButtonPressed(d2interface.MouseButtonMiddle) {
-		im.buttonMod |= d2interface.MouseButtonModMiddle
+	if im.inputService.IsMouseButtonPressed(d2enum.MouseButtonMiddle) {
+		im.buttonMod |= d2enum.MouseButtonModMiddle
 	}
 
-	if im.inputService.IsMouseButtonPressed(d2interface.MouseButtonRight) {
-		im.buttonMod |= d2interface.MouseButtonModRight
+	if im.inputService.IsMouseButtonPressed(d2enum.MouseButtonRight) {
+		im.buttonMod |= d2enum.MouseButtonModRight
 	}
 }
 
-func (im *inputManager) updateJustPressedKey(k d2interface.Key, e HandlerEvent) {
+func (im *inputManager) updateJustPressedKey(k d2enum.Key, e HandlerEvent) {
 	if im.inputService.IsKeyJustPressed(k) {
 		event := KeyEvent{HandlerEvent: e, key: k}
 
@@ -95,7 +103,7 @@ func (im *inputManager) updateJustPressedKey(k d2interface.Key, e HandlerEvent) 
 	}
 }
 
-func (im *inputManager) updateJustReleasedKey(k d2interface.Key, e HandlerEvent) {
+func (im *inputManager) updateJustReleasedKey(k d2enum.Key, e HandlerEvent) {
 	if im.inputService.IsKeyJustReleased(k) {
 		event := KeyEvent{HandlerEvent: e, key: k}
 
@@ -110,7 +118,7 @@ func (im *inputManager) updateJustReleasedKey(k d2interface.Key, e HandlerEvent)
 	}
 }
 
-func (im *inputManager) updatePressedKey(k d2interface.Key, e HandlerEvent) {
+func (im *inputManager) updatePressedKey(k d2enum.Key, e HandlerEvent) {
 	if im.inputService.IsKeyPressed(k) {
 		event := KeyEvent{
 			HandlerEvent: e,
@@ -144,7 +152,7 @@ func (im *inputManager) updateInputChars(eventBase HandlerEvent) {
 	}
 }
 
-func (im *inputManager) updateJustPressedButton(b d2interface.MouseButton, e HandlerEvent) {
+func (im *inputManager) updateJustPressedButton(b d2enum.MouseButton, e HandlerEvent) {
 	if im.inputService.IsMouseButtonJustPressed(b) {
 		event := MouseEvent{e, b}
 
@@ -159,7 +167,7 @@ func (im *inputManager) updateJustPressedButton(b d2interface.MouseButton, e Han
 	}
 }
 
-func (im *inputManager) updateJustReleasedButton(b d2interface.MouseButton, e HandlerEvent) {
+func (im *inputManager) updateJustReleasedButton(b d2enum.MouseButton, e HandlerEvent) {
 	if im.inputService.IsMouseButtonJustReleased(b) {
 		event := MouseEvent{e, b}
 
@@ -174,7 +182,7 @@ func (im *inputManager) updateJustReleasedButton(b d2interface.MouseButton, e Ha
 	}
 }
 
-func (im *inputManager) updatePressedButton(b d2interface.MouseButton, e HandlerEvent) {
+func (im *inputManager) updatePressedButton(b d2enum.MouseButton, e HandlerEvent) {
 	if im.inputService.IsMouseButtonPressed(b) {
 		event := MouseEvent{e, b}
 
@@ -209,17 +217,17 @@ func (im *inputManager) updateCursor(cursorX, cursorY int, e HandlerEvent) {
 // BindHandlerWithPriority adds an event handler with a specific call priority
 func (im *inputManager) BindHandlerWithPriority(
 	h d2interface.InputEventHandler,
-	p d2interface.Priority) error {
-	return singleton.bindHandler(h, p)
+	p d2enum.Priority) error {
+	return im.bindHandler(h, p)
 }
 
 // BindHandler adds an event handler
 func (im *inputManager) BindHandler(h d2interface.InputEventHandler) error {
-	return im.bindHandler(h, d2interface.PriorityDefault)
+	return im.bindHandler(h, d2enum.PriorityDefault)
 }
 
 // BindHandler adds an event handler
-func (im *inputManager) bindHandler(h d2interface.InputEventHandler, p d2interface.Priority) error {
+func (im *inputManager) bindHandler(h d2interface.InputEventHandler, p d2enum.Priority) error {
 	for _, entry := range im.entries {
 		if entry.handler == h {
 			return ErrHasReg
@@ -248,7 +256,7 @@ func (im *inputManager) UnbindHandler(handler d2interface.InputEventHandler) err
 }
 
 func (im *inputManager) propagate(callback func(d2interface.InputEventHandler) bool) {
-	var priority d2interface.Priority
+	var priority d2enum.Priority
 
 	var handled bool
 
@@ -267,7 +275,7 @@ func (im *inputManager) propagate(callback func(d2interface.InputEventHandler) b
 
 type handlerEntry struct {
 	handler  d2interface.InputEventHandler
-	priority d2interface.Priority
+	priority d2enum.Priority
 }
 
 type handlerEntryList []handlerEntry
