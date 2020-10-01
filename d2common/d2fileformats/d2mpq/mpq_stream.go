@@ -11,8 +11,8 @@ import (
 
 	"github.com/JoshVarga/blast"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2compression"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math"
 )
 
 // Stream represents a stream of data in an MPQ archive
@@ -62,11 +62,17 @@ func (v *Stream) loadBlockOffsets() error {
 	blockPositionCount := ((v.BlockTableEntry.UncompressedFileSize + v.BlockSize - 1) / v.BlockSize) + 1
 	v.BlockPositions = make([]uint32, blockPositionCount)
 
-	_, _ = v.MPQData.file.Seek(int64(v.BlockTableEntry.FilePosition), 0)
+	_, err := v.MPQData.file.Seek(int64(v.BlockTableEntry.FilePosition), 0)
+	if err != nil {
+		return err
+	}
 
 	mpqBytes := make([]byte, blockPositionCount*4) //nolint:gomnd MPQ magic
 
-	_, _ = v.MPQData.file.Read(mpqBytes)
+	_, err = v.MPQData.file.Read(mpqBytes)
+	if err != nil {
+		return err
+	}
 
 	for i := range v.BlockPositions {
 		idx := i * 4 //nolint:gomnd MPQ magic
@@ -120,7 +126,7 @@ func (v *Stream) readInternalSingleUnit(buffer []byte, offset, count uint32) uin
 		v.loadSingleUnit()
 	}
 
-	bytesToCopy := d2common.Min(uint32(len(v.CurrentData))-v.CurrentPosition, count)
+	bytesToCopy := d2math.Min(uint32(len(v.CurrentData))-v.CurrentPosition, count)
 
 	copy(buffer[offset:offset+bytesToCopy], v.CurrentData[v.CurrentPosition:v.CurrentPosition+bytesToCopy])
 
@@ -133,7 +139,7 @@ func (v *Stream) readInternal(buffer []byte, offset, count uint32) uint32 {
 	v.bufferData()
 
 	localPosition := v.CurrentPosition % v.BlockSize
-	bytesToCopy := d2common.MinInt32(int32(len(v.CurrentData))-int32(localPosition), int32(count))
+	bytesToCopy := d2math.MinInt32(int32(len(v.CurrentData))-int32(localPosition), int32(count))
 
 	if bytesToCopy <= 0 {
 		return 0
@@ -153,15 +159,21 @@ func (v *Stream) bufferData() {
 		return
 	}
 
-	expectedLength := d2common.Min(v.BlockTableEntry.UncompressedFileSize-(requiredBlock*v.BlockSize), v.BlockSize)
+	expectedLength := d2math.Min(v.BlockTableEntry.UncompressedFileSize-(requiredBlock*v.BlockSize), v.BlockSize)
 	v.CurrentData = v.loadBlock(requiredBlock, expectedLength)
 	v.CurrentBlockIndex = requiredBlock
 }
 
 func (v *Stream) loadSingleUnit() {
 	fileData := make([]byte, v.BlockSize)
-	_, _ = v.MPQData.file.Seek(int64(v.MPQData.data.HeaderSize), 0)
-	_, _ = v.MPQData.file.Read(fileData)
+	_, err := v.MPQData.file.Seek(int64(v.MPQData.data.HeaderSize), 0)
+	if err != nil {
+		log.Print(err)
+	}
+	_, err = v.MPQData.file.Read(fileData)
+	if err != nil {
+		log.Print(err)
+	}
 
 	if v.BlockSize == v.BlockTableEntry.UncompressedFileSize {
 		v.CurrentData = fileData
@@ -188,8 +200,14 @@ func (v *Stream) loadBlock(blockIndex, expectedLength uint32) []byte {
 	offset += v.BlockTableEntry.FilePosition
 	data := make([]byte, toRead)
 
-	_, _ = v.MPQData.file.Seek(int64(offset), 0)
-	_, _ = v.MPQData.file.Read(data)
+	_, err := v.MPQData.file.Seek(int64(offset), 0)
+	if err != nil {
+		log.Print(err)
+	}
+	_, err = v.MPQData.file.Read(data)
+	if err != nil {
+		log.Print(err)
+	}
 
 	if v.BlockTableEntry.HasFlag(FileEncrypted) && v.BlockTableEntry.UncompressedFileSize > 3 {
 		if v.EncryptionSeed == 0 {

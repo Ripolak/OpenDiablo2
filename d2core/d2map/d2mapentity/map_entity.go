@@ -1,11 +1,18 @@
 package d2mapentity
 
 import (
+	"github.com/google/uuid"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
+)
+
+const (
+	minHitboxSize = 30
 )
 
 // mapEntity represents an entity on the map that can be animated
 type mapEntity struct {
+	uuid     string
 	Position d2vector.Position
 	Target   d2vector.Position
 	velocity d2vector.Vector
@@ -16,6 +23,8 @@ type mapEntity struct {
 
 	done        func()
 	directioner func(direction int)
+
+	highlight bool
 }
 
 // newMapEntity creates an instance of mapEntity
@@ -23,6 +32,7 @@ func newMapEntity(x, y int) mapEntity {
 	pos := d2vector.NewPosition(float64(x), float64(y))
 
 	return mapEntity{
+		uuid:     uuid.New().String(),
 		Position: pos,
 		Target:   pos,
 		velocity: *d2vector.VectorZero(),
@@ -45,6 +55,12 @@ func (m *mapEntity) SetPath(path []d2vector.Position, done func()) {
 // ClearPath clears the entity movement path.
 func (m *mapEntity) ClearPath() {
 	m.path = nil
+}
+
+// StopMoving  will clear the path and target of the entity.
+func (m *mapEntity) StopMoving() {
+	m.ClearPath()
+	m.setTarget(m.Position, nil)
 }
 
 // SetSpeed sets the entity movement speed.
@@ -190,16 +206,22 @@ func (m *mapEntity) GetPositionF() (x, y float64) {
 	return w.X(), w.Y()
 }
 
-// Name returns the NPC's in-game name (e.g. "Deckard Cain") or an empty string if it does not have a name
-func (m *mapEntity) Name() string {
+// Label returns the NPC's in-game name (e.g. "Deckard Cain") or an empty string if it does not have a name
+func (m *mapEntity) Label() string {
 	return ""
 }
 
 // Highlight is not currently implemented.
 func (m *mapEntity) Highlight() {
+	m.highlight = true
 }
 
 // Selectable returns true if the object can be highlighted/selected.
 func (m *mapEntity) Selectable() bool {
 	return false
+}
+
+// GetSize returns the current frame size
+func (m *mapEntity) GetSize() (width, height int) {
+	return minHitboxSize, minHitboxSize
 }

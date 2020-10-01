@@ -1,9 +1,10 @@
 package d2localclient
 
 import (
-	uuid "github.com/satori/go.uuid"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
+	"github.com/google/uuid"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2player"
 	"github.com/OpenDiablo2/OpenDiablo2/d2networking"
 	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2client/d2clientconnectiontype"
 	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket"
@@ -13,10 +14,13 @@ import (
 // LocalClientConnection is the implementation of ClientConnection
 // for a local client.
 type LocalClientConnection struct {
+	asset             *d2asset.AssetManager
+	heroState         *d2hero.HeroStateFactory
 	clientListener    d2networking.ClientListener // The game client
 	uniqueID          string                      // Unique ID generated on construction
 	openNetworkServer bool                        // True if this is a server
-	playerState       *d2player.PlayerState       // Local player state
+	playerState       *d2hero.HeroState           // Local player state
+	gameServer        *d2server.GameServer        // Game Server
 }
 
 // GetUniqueID returns LocalClientConnection.uniqueID.
@@ -37,21 +41,37 @@ func (l *LocalClientConnection) SendPacketToClient(packet d2netpacket.NetPacket)
 
 // Create constructs a new LocalClientConnection and returns
 // a pointer to it.
-func Create(openNetworkServer bool) *LocalClientConnection {
+func Create(asset *d2asset.AssetManager, openNetworkServer bool) (*LocalClientConnection, error) {
+	heroStateFactory, err := d2hero.NewHeroStateFactory(asset)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &LocalClientConnection{
-		uniqueID:          uuid.NewV4().String(),
+		heroState:         heroStateFactory,
+		asset:             asset,
+		uniqueID:          uuid.New().String(),
 		openNetworkServer: openNetworkServer,
 	}
 
-	return result
+	return result, nil
 }
 
 // Open creates a new GameServer, runs the server and connects this client to it.
 func (l *LocalClientConnection) Open(_, saveFilePath string) error {
-	l.SetPlayerState(d2player.LoadPlayerState(saveFilePath))
-	d2server.Create(l.openNetworkServer)
+	var err error
 
-	go d2server.Run()
+	l.SetPlayerState(l.heroState.LoadHeroState(saveFilePath))
+
+	l.gameServer, err = d2server.NewGameServer(l.asset, l.openNetworkServer, 30)
+	if err != nil {
+		return err
+	}
+
+	if err := l.gameServer.Start(); err != nil {
+		return err
+	}
+
 	d2server.OnClientConnected(l)
 
 	return nil
@@ -65,7 +85,7 @@ func (l *LocalClientConnection) Close() error {
 	}
 
 	d2server.OnClientDisconnected(l)
-	d2server.Destroy()
+	l.gameServer.Stop()
 
 	return nil
 }
@@ -82,11 +102,11 @@ func (l *LocalClientConnection) SetClientListener(listener d2networking.ClientLi
 }
 
 // GetPlayerState returns LocalClientConnection.playerState.
-func (l *LocalClientConnection) GetPlayerState() *d2player.PlayerState {
+func (l *LocalClientConnection) GetPlayerState() *d2hero.HeroState {
 	return l.playerState
 }
 
 // SetPlayerState sets LocalClientConnection.playerState to the given value.
-func (l *LocalClientConnection) SetPlayerState(playerState *d2player.PlayerState) {
+func (l *LocalClientConnection) SetPlayerState(playerState *d2hero.HeroState) {
 	l.playerState = playerState
 }

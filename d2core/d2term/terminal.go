@@ -11,18 +11,19 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math"
 )
 
 const (
-	termCharWidth   = 6
-	termCharHeight  = 16
-	termRowCount    = 24
-	termRowCountMax = 32
-	termColCountMax = 128
-	termAnimLength  = 0.5
+	termCharWidth       = 6
+	termCharHeight      = 16
+	termCharDoubleWidth = termCharWidth * 2
+	termRowCount        = 24
+	termRowCountMax     = 32
+	termColCountMax     = 128
+	termAnimLength      = 0.5
 )
 
 const (
@@ -114,9 +115,9 @@ func (t *terminal) OnKeyDown(event d2interface.KeyEvent) bool {
 	case d2enum.KeyEnd:
 		t.outputIndex = 0
 	case d2enum.KeyHome:
-		t.outputIndex = d2common.MaxInt(0, len(t.outputHistory)-t.lineCount)
+		t.outputIndex = d2math.MaxInt(0, len(t.outputHistory)-t.lineCount)
 	case d2enum.KeyPageUp:
-		maxOutputIndex := d2common.MaxInt(0, len(t.outputHistory)-t.lineCount)
+		maxOutputIndex := d2math.MaxInt(0, len(t.outputHistory)-t.lineCount)
 		if t.outputIndex += t.lineCount; t.outputIndex >= maxOutputIndex {
 			t.outputIndex = maxOutputIndex
 		}
@@ -168,7 +169,7 @@ func (t *terminal) handleControlKey(eventKey d2enum.Key, keyMod d2enum.KeyMod) {
 	switch eventKey {
 	case d2enum.KeyUp:
 		if keyMod == d2enum.KeyModControl {
-			t.lineCount = d2common.MaxInt(0, t.lineCount-1)
+			t.lineCount = d2math.MaxInt(0, t.lineCount-1)
 		} else if len(t.commandHistory) > 0 {
 			t.command = t.commandHistory[t.commandIndex]
 			if t.commandIndex == 0 {
@@ -179,7 +180,7 @@ func (t *terminal) handleControlKey(eventKey d2enum.Key, keyMod d2enum.KeyMod) {
 		}
 	case d2enum.KeyDown:
 		if keyMod == d2enum.KeyModControl {
-			t.lineCount = d2common.MinInt(t.lineCount+1, termRowCountMax)
+			t.lineCount = d2math.MinInt(t.lineCount+1, termRowCountMax)
 		}
 	}
 }
@@ -231,9 +232,9 @@ func (t *terminal) Render(surface d2interface.Surface) error {
 
 		historyEntry := t.outputHistory[historyIndex]
 
-		surface.PushTranslation(termCharWidth*2, outputHeight-(i+1)*termCharHeight)
+		surface.PushTranslation(termCharDoubleWidth, outputHeight-(i+1)*termCharHeight)
 		surface.DrawTextf(historyEntry.text)
-		surface.PushTranslation(-termCharWidth*2, 0)
+		surface.PushTranslation(-termCharDoubleWidth, 0)
 
 		switch historyEntry.category {
 		case d2enum.TermCategoryInfo:

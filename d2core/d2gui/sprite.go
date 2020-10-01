@@ -31,8 +31,8 @@ type AnimatedSprite struct {
 	*Sprite
 }
 
-func createSprite(imagePath, palettePath string) (*Sprite, error) {
-	animation, err := d2asset.LoadAnimation(imagePath, palettePath)
+func createSprite(imagePath, palettePath string, assetManager *d2asset.AssetManager) (*Sprite, error) {
+	animation, err := assetManager.LoadAnimation(imagePath, palettePath)
 	if err != nil {
 		return nil, err
 	}
@@ -44,17 +44,13 @@ func createSprite(imagePath, palettePath string) (*Sprite, error) {
 	return sprite, nil
 }
 
-func createAnimatedSprite(imagePath, palettePath string, direction AnimationDirection) (*AnimatedSprite, error) {
-	animation, err := d2asset.LoadAnimation(imagePath, palettePath)
+func createAnimatedSprite(imagePath, palettePath string, direction AnimationDirection, assetManager *d2asset.AssetManager) (*AnimatedSprite, error) {
+	animation, err := assetManager.LoadAnimation(imagePath, palettePath)
 	if err != nil {
 		return nil, err
 	}
 
-	sprite := &AnimatedSprite{
-		&Sprite{},
-	}
-
-	sprite.animation = animation
+	sprite := &AnimatedSprite{Sprite: &Sprite{animation: animation}}
 
 	if direction == DirectionForward {
 		sprite.animation.PlayForward()

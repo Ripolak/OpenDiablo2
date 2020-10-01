@@ -88,9 +88,18 @@ const (
 	GamePanels          = "/data/global/ui/PANEL/800ctrlpnl7.dc6"
 	GameGlobeOverlap    = "/data/global/ui/PANEL/overlap.DC6"
 	HealthManaIndicator = "/data/global/ui/PANEL/hlthmana.DC6"
-	GameSmallMenuButton = "/data/global/ui/PANEL/menubutton.DC6" // TODO: Used for inventory popout
-	SkillIcon           = "/data/global/ui/PANEL/Skillicon.DC6"  // TODO: Used for skill icon button
 	AddSkillButton      = "/data/global/ui/PANEL/level.DC6"
+
+	// --- Help Overlay ---
+
+	//HelpBorder = "/data/global/ui/MENU/helpborder.DC6"
+	HelpBorder       = "/data/global/ui/MENU/800helpborder.DC6"
+	HelpYellowBullet = "/data/global/ui/MENU/helpyellowbullet.DC6"
+	HelpWhiteBullet  = "/data/global/ui/MENU/helpwhitebullet.DC6"
+
+	// Issue #685 - used in the mini-panel
+	GameSmallMenuButton = "/data/global/ui/PANEL/menubutton.DC6"
+	SkillIcon           = "/data/global/ui/PANEL/Skillicon.DC6"
 
 	// --- Mouse Pointers ---
 
@@ -98,7 +107,7 @@ const (
 
 	// --- Fonts & Locale (strings) ---
 
-	LanguageFontToken    = "{LANG_FONT}"
+	LanguageFontToken    = "{LANG_FONT}" //nolint:gosec // this is just a format string
 	LanguageTableToken   = "{LANG}"
 	Font6                = "/data/local/FONT/" + LanguageFontToken + "/font6"
 	Font8                = "/data/local/FONT/" + LanguageFontToken + "/font8"
@@ -132,6 +141,7 @@ const (
 	// --- GAME UI ---
 
 	PentSpin        = "/data/global/ui/CURSOR/pentspin.DC6"
+	Minipanel       = "/data/global/ui/PANEL/minipanel.DC6"
 	MinipanelSmall  = "/data/global/ui/PANEL/minipanel_s.dc6"
 	MinipanelButton = "/data/global/ui/PANEL/minipanelbtn.DC6"
 
@@ -158,7 +168,7 @@ const (
 	RunButton      = "/data/global/ui/PANEL/runbutton.dc6"
 	MenuButton     = "/data/global/ui/PANEL/menubutton.DC6"
 	GoldCoinButton = "/data/global/ui/panel/goldcoinbtn.dc6"
-	SquareButton   = "/data/global/ui/panel/buysellbtn.dc6"
+	BuySellButton  = "/data/global/ui/panel/buysellbtn.dc6"
 
 	ArmorPlaceholder      = "/data/global/ui/PANEL/inv_armor.DC6"
 	BeltPlaceholder       = "/data/global/ui/PANEL/inv_belt.DC6"
@@ -171,37 +181,54 @@ const (
 
 	LevelPreset        = "/data/global/excel/LvlPrest.txt"
 	LevelType          = "/data/global/excel/LvlTypes.txt"
-	ObjectType         = "/data/global/excel/objtype.bin"
+	ObjectType         = "/data/global/excel/objtype.txt"
 	LevelWarp          = "/data/global/excel/LvlWarp.txt"
 	LevelDetails       = "/data/global/excel/Levels.txt"
 	LevelMaze          = "/data/global/excel/LvlMaze.txt"
 	LevelSubstitutions = "/data/global/excel/LvlSub.txt"
 
-	ObjectDetails    = "/data/global/excel/Objects.txt"
-	SoundSettings    = "/data/global/excel/Sounds.txt"
-	ItemStatCost     = "/data/global/excel/ItemStatCost.txt"
-	ItemTypes        = "/data/global/excel/ItemTypes.txt"
-	QualityItems     = "/data/global/excel/qualityitems.txt"
-	Runes            = "/data/global/excel/runes.txt"
-	Sets             = "/data/global/excel/Sets.txt"
-	SetItems         = "/data/global/excel/SetItems.txt"
-	AutoMagic        = "/data/global/excel/automagic.txt"
-	BodyLocations    = "/data/global/excel/bodylocs.txt"
-	Properties       = "/data/global/excel/Properties.txt"
-	Hireling         = "/data/global/excel/hireling.txt"
-	DifficultyLevels = "/data/global/excel/difficultylevels.txt"
-	AutoMap          = "/data/global/excel/AutoMap.txt"
-	CubeRecipes      = "/data/global/excel/cubemain.txt"
-	Skills           = "/data/global/excel/skills.txt"
-	SkillDesc        = "/data/global/excel/skilldesc.txt"
-	TreasureClass    = "/data/global/excel/TreasureClassEx.txt"
-	States           = "/data/global/excel/states.txt"
-	SoundEnvirons    = "/data/global/excel/soundenviron.txt"
-	Shrines          = "/data/global/excel/shrines.txt"
-	MonProp          = "/data/global/excel/Monprop.txt"
-	ElemType         = "/data/global/excel/ElemTypes.txt"
-	PlrMode          = "/data/global/excel/PlrMode.txt"
-	PetType          = "/data/global/excel/pettype.txt"
+	ObjectDetails         = "/data/global/excel/Objects.txt"
+	SoundSettings         = "/data/global/excel/Sounds.txt"
+	ItemStatCost          = "/data/global/excel/ItemStatCost.txt"
+	ItemRatio             = "/data/global/excel/itemratio.txt"
+	ItemTypes             = "/data/global/excel/ItemTypes.txt"
+	QualityItems          = "/data/global/excel/qualityitems.txt"
+	Overlays              = "/data/global/excel/Overlay.txt"
+	Runes                 = "/data/global/excel/runes.txt"
+	Sets                  = "/data/global/excel/Sets.txt"
+	SetItems              = "/data/global/excel/SetItems.txt"
+	AutoMagic             = "/data/global/excel/automagic.txt"
+	BodyLocations         = "/data/global/excel/bodylocs.txt"
+	Events                = "/data/global/excel/events.txt"
+	Properties            = "/data/global/excel/Properties.txt"
+	Hireling              = "/data/global/excel/hireling.txt"
+	DifficultyLevels      = "/data/global/excel/difficultylevels.txt"
+	AutoMap               = "/data/global/excel/AutoMap.txt"
+	CubeRecipes           = "/data/global/excel/cubemain.txt"
+	Skills                = "/data/global/excel/skills.txt"
+	SkillDesc             = "/data/global/excel/skilldesc.txt"
+	SkillCalc             = "/data/global/excel/skillcalc.txt"
+	MissileCalc           = "/data/global/excel/misscalc.txt"
+	TreasureClass         = "/data/global/excel/TreasureClassEx.txt"
+	States                = "/data/global/excel/states.txt"
+	SoundEnvirons         = "/data/global/excel/soundenviron.txt"
+	Shrines               = "/data/global/excel/shrines.txt"
+	MonProp               = "/data/global/excel/Monprop.txt"
+	ElemType              = "/data/global/excel/ElemTypes.txt"
+	PlrMode               = "/data/global/excel/PlrMode.txt"
+	PetType               = "/data/global/excel/pettype.txt"
+	NPC                   = "/data/global/excel/npc.txt"
+	MonsterUniqueModifier = "/data/global/excel/monumod.txt"
+	MonsterEquipment      = "/data/global/excel/monequip.txt"
+	UniqueAppellation     = "/data/global/excel/UniqueAppellation.txt"
+	MonsterLevel          = "/data/global/excel/monlvl.txt"
+	MonsterSound          = "/data/global/excel/monsounds.txt"
+	MonsterSequence       = "/data/global/excel/monseq.txt"
+	PlayerClass           = "/data/global/excel/PlayerClass.txt"
+	ObjectGroup           = "/data/global/excel/objgroup.txt"
+	CompCode              = "/data/global/excel/compcode.txt"
+	Belts                 = "/data/global/excel/belts.txt"
+
 
 	// --- Animations ---
 
@@ -209,6 +236,7 @@ const (
 	AnimationData       = "/data/global/animdata.d2"
 	PlayerAnimationBase = "/data/global/CHARS"
 	MissileData         = "/data/global/missiles"
+	ItemGraphics        = "/data/global/items"
 
 	// --- Inventory Data ---
 
@@ -224,11 +252,10 @@ const (
 
 	MagicPrefix = "/data/global/excel/MagicPrefix.txt"
 	MagicSuffix = "/data/global/excel/MagicSuffix.txt"
+	RarePrefix  = "/data/global/excel/RarePrefix.txt" // these are for item names
+	RareSuffix  = "/data/global/excel/RareSuffix.txt"
 
 	// --- Monster Prefix/Suffixes (?) ---
-
-	RarePrefix   = "/data/global/excel/RarePrefix.txt"
-	RareSuffix   = "/data/global/excel/RareSuffix.txt"
 	UniquePrefix = "/data/global/excel/UniquePrefix.txt"
 	UniqueSuffix = "/data/global/excel/UniqueSuffix.txt"
 
@@ -288,12 +315,12 @@ const (
 	SFXButtonClick         = "cursor_button_click"
 	SFXAmazonDeselect      = "cursor_amazon_deselect"
 	SFXAmazonSelect        = "cursor_amazon_select"
-	SFXAssassinDeselect    = "/data/global/sfx/Cursor/intro/assassin deselect.wav"
-	SFXAssassinSelect      = "/data/global/sfx/Cursor/intro/assassin select.wav"
+	SFXAssassinDeselect    = "Cursor/intro/assassin deselect.wav"
+	SFXAssassinSelect      = "Cursor/intro/assassin select.wav"
 	SFXBarbarianDeselect   = "cursor_barbarian_deselect"
 	SFXBarbarianSelect     = "cursor_barbarian_select"
-	SFXDruidDeselect       = "/data/global/sfx/Cursor/intro/druid deselect.wav"
-	SFXDruidSelect         = "/data/global/sfx/Cursor/intro/druid select.wav"
+	SFXDruidDeselect       = "Cursor/intro/druid deselect.wav"
+	SFXDruidSelect         = "Cursor/intro/druid select.wav"
 	SFXNecromancerDeselect = "cursor_necromancer_deselect"
 	SFXNecromancerSelect   = "cursor_necromancer_select"
 	SFXPaladinDeselect     = "cursor_paladin_deselect"
@@ -303,12 +330,14 @@ const (
 
 	// --- Enemy Data ---
 
-	MonStats     = "/data/global/excel/monstats.txt"
-	MonStats2    = "/data/global/excel/monstats2.txt"
-	MonPreset    = "/data/global/excel/monpreset.txt"
-	MonType      = "/data/global/excel/Montype.txt"
-	SuperUniques = "/data/global/excel/SuperUniques.txt"
-	MonMode      = "/data/global/excel/monmode.txt"
+	MonStats         = "/data/global/excel/monstats.txt"
+	MonStats2        = "/data/global/excel/monstats2.txt"
+	MonPreset        = "/data/global/excel/monpreset.txt"
+	MonType          = "/data/global/excel/Montype.txt"
+	SuperUniques     = "/data/global/excel/SuperUniques.txt"
+	MonMode          = "/data/global/excel/monmode.txt"
+	MonsterPlacement = "/data/global/excel/MonPlace.txt"
+	MonsterAI        = "/data/global/excel/monai.txt"
 
 	// --- Skill Data ---
 

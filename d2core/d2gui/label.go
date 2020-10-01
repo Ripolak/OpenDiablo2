@@ -1,8 +1,11 @@
 package d2gui
 
 import (
+	"log"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 )
 
 // Label is renderable text
@@ -11,25 +14,24 @@ type Label struct {
 
 	renderer d2interface.Renderer
 	text     string
-	font     d2interface.Font
+	font     *d2asset.Font
 	surface  d2interface.Surface
 }
 
-func createLabel(renderer d2interface.Renderer, text string, fontStyle FontStyle) (*Label, error) {
-	font, err := loadFont(fontStyle)
-	if err != nil {
-		return nil, err
-	}
-
+func createLabel(renderer d2interface.Renderer, text string, font *d2asset.Font) *Label {
 	label := &Label{
 		font:     font,
 		renderer: renderer,
 	}
 
-	_ = label.setText(text)
+	err := label.setText(text)
+	if err != nil {
+		log.Print(err)
+		return nil
+	}
 	label.SetVisible(true)
 
-	return label, nil
+	return label
 }
 
 func (l *Label) render(target d2interface.Surface) error {

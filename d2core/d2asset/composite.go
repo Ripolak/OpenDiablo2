@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2cof"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
@@ -13,6 +12,7 @@ import (
 
 // Composite is a composite entity animation
 type Composite struct {
+	*AssetManager
 	baseType    d2enum.ObjectType
 	basePath    string
 	token       string
@@ -20,12 +20,12 @@ type Composite struct {
 	direction   int
 	equipment   [d2enum.CompositeTypeMax]string
 	mode        *compositeMode
+	size        *size
 }
 
-// CreateComposite creates a Composite from a given ObjectLookupRecord and palettePath.
-func CreateComposite(baseType d2enum.ObjectType, token, palettePath string) *Composite {
-	return &Composite{baseType: baseType, basePath: baseString(baseType),
-		token: token, palettePath: palettePath}
+type size struct {
+	Width  int
+	Height int
 }
 
 // Advance moves the composite animation forward for a given elapsed time in nanoseconds.
@@ -62,6 +62,7 @@ func (c *Composite) Render(target d2interface.Surface) error {
 
 	for _, layerIndex := range c.mode.cof.Priority[direction][c.mode.frameIndex] {
 		layer := c.mode.layers[layerIndex]
+
 		if layer != nil {
 			if err := layer.RenderFromOrigin(target, true); err != nil {
 				return err
@@ -144,6 +145,10 @@ func (c *Composite) SetAnimSpeed(speed int) {
 
 // SetDirection sets the direction of the composite and its layers
 func (c *Composite) SetDirection(direction int) {
+	if c.mode == nil {
+		return
+	}
+
 	c.direction = direction
 	for layerIdx := range c.mode.layers {
 		layer := c.mode.layers[layerIdx]
@@ -227,20 +232,20 @@ type compositeMode struct {
 
 func (c *Composite) createMode(animationMode animationMode, weaponClass string) (*compositeMode, error) {
 	cofPath := fmt.Sprintf("%s/%s/COF/%s%s%s.COF", c.basePath, c.token, c.token, animationMode, weaponClass)
-	if exists, _ := FileExists(cofPath); !exists {
-		return nil, errors.New("composite not found")
+	if exists, err := c.FileExists(cofPath); !exists {
+		return nil, fmt.Errorf("composite not found at path '%s': %v", cofPath, err)
 	}
 
-	cof, err := loadCOF(cofPath)
+	cof, err := c.loadCOF(cofPath)
 	if err != nil {
 		return nil, err
 	}
 
 	animationKey := strings.ToLower(c.token + animationMode.String() + weaponClass)
 
-	animationData := d2data.AnimationData[animationKey]
+	animationData := c.Records.Animations[animationKey]
 	if len(animationData) == 0 {
-		return nil, errors.New("could not find animation data")
+		return nil, errors.New("could not find Animation data")
 	}
 
 	mode := &compositeMode{
@@ -269,6 +274,7 @@ func (c *Composite) createMode(animationMode animationMode, weaponClass string) 
 		if err == nil {
 			layer.SetPlaySpeed(mode.animationSpeed)
 			layer.PlayForward()
+			layer.SetShadow(cofLayer.Shadow != 0)
 
 			if err := layer.SetDirection(c.direction); err != nil {
 				return nil, err
@@ -289,15 +295,65 @@ func (c *Composite) loadCompositeLayer(layerKey, layerValue, animationMode, weap
 	}
 
 	for _, animationPath := range animationPaths {
-		if exists, _ := FileExists(animationPath); exists {
-			animation, err := LoadAnimationWithEffect(animationPath, palettePath, drawEffect)
+
+		if exists, err := c.FileExists(animationPath); exists && err == nil {
+			animation, err := c.LoadAnimationWithEffect(animationPath, palettePath, drawEffect)
 			if err == nil {
 				return animation, nil
 			}
+		} else {
+			return nil, fmt.Errorf("animation path '%s' not found: %v", animationPath, err)
 		}
 	}
 
 	return nil, errors.New("animation not found")
+}
+
+// GetSize returns the size of the composite
+func (c *Composite) GetSize() (w, h int) {
+	c.updateSize()
+	return c.size.Width, c.size.Height
+}
+
+func (c *Composite) updateSize() {
+	if c.mode == nil {
+		return
+	}
+
+	direction := d2cof.Dir64ToCof(c.direction, c.mode.cof.NumberOfDirections)
+
+	biggestW, biggestH := 0, 0
+
+	for _, layerIndex := range c.mode.cof.Priority[direction][c.mode.frameIndex] {
+		layer := c.mode.layers[layerIndex]
+		if layer != nil {
+			w, h := layer.GetCurrentFrameSize()
+
+			if biggestW < w {
+				biggestW = w
+			}
+
+			if biggestH < h {
+				biggestH = h
+			}
+		}
+	}
+
+	if c.size == nil {
+		c.size = &size{}
+	}
+
+	c.size.Width = biggestW
+	c.size.Height = biggestH
+}
+
+func (c *Composite) loadCOF(cofPath string) (*d2cof.COF, error) {
+	cofData, err := c.LoadFile(cofPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return d2cof.Load(cofData)
 }
 
 func baseString(baseType d2enum.ObjectType) string {

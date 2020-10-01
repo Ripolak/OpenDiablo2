@@ -7,22 +7,48 @@ import (
 	"log"
 	"math"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
-
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2ds1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
 )
 
 const (
 	screenMiddleX = 400
+	two           = 2
+
+	dbgOffsetXY   = 40
+	dbgBoxWidth   = 220
+	dbgBoxHeight  = 60
+	dbgBoxPadding = 10
+
+	dbgCollisionSize    = 5
+	dbgCollisionOffsetX = -3
+	dbgCollisionOffsetY = 4
+
+	whiteHalfOpacity        = 0xffffff7f
+	blackQuarterOpacity     = 0x00000040
+	lightGreenFullOpacity   = 0x40ff00ff
+	magentaFullOpacity      = 0xff00ffff
+	yellowFullOpacity       = 0xffff00ff
+	lightBlueQuarterOpacity = 0x5050ff32
+	whiteQuarterOpacity     = 0xffffff64
+	redQuarterOpacity       = 0x74000064
+
+	subtilesPerTile    = 5
+	orthoSubTileWidth  = 16
+	orthoSubTileHeight = 8
+	orthoTileWidth     = subtilesPerTile * orthoSubTileWidth
+	orthoTileHeight    = subtilesPerTile * orthoSubTileHeight
 )
 
 // MapRenderer manages the game viewport and Camera. It requests tile and entity data from MapEngine and renders it.
 type MapRenderer struct {
+	asset               *d2asset.AssetManager
 	renderer            d2interface.Renderer   // Used for drawing operations
 	mapEngine           *d2mapengine.MapEngine // The map engine that is being rendered
 	palette             d2interface.Palette    // The palette used for this map
@@ -36,9 +62,11 @@ type MapRenderer struct {
 }
 
 // CreateMapRenderer creates a new MapRenderer, sets the required fields and returns a pointer to it.
-func CreateMapRenderer(renderer d2interface.Renderer, mapEngine *d2mapengine.MapEngine,
+func CreateMapRenderer(asset *d2asset.AssetManager, renderer d2interface.Renderer,
+	mapEngine *d2mapengine.MapEngine,
 	term d2interface.Terminal, startX, startY float64) *MapRenderer {
 	result := &MapRenderer{
+		asset:     asset,
 		renderer:  renderer,
 		mapEngine: mapEngine,
 		viewport:  NewViewport(0, 0, 800, 600),
@@ -171,8 +199,10 @@ func (mr *MapRenderer) renderPass2(target d2interface.Surface, startX, startY, e
 		for tileX := startX; tileX < endX; tileX++ {
 			mr.viewport.PushTranslationWorld(float64(tileX), float64(tileY))
 
+			tileEnt := make([]d2interface.MapEntity, 0)
+
 			// TODO: Do not loop over every entity every frame
-			for _, mapEntity := range *mr.mapEngine.Entities() {
+			for _, mapEntity := range mr.mapEngine.Entities() {
 				pos := mapEntity.GetPosition()
 				vec := pos.World()
 				entityX, entityY := vec.X(), vec.Y()
@@ -185,9 +215,22 @@ func (mr *MapRenderer) renderPass2(target d2interface.Surface, startX, startY, e
 					continue
 				}
 
-				target.PushTranslation(mr.viewport.GetTranslationScreen())
-				mapEntity.Render(target)
-				target.Pop()
+				tileEnt = append(tileEnt, mapEntity)
+			}
+
+			for subY := 0; subY < 5; subY++ {
+				for subX := 0; subX < 5; subX++ {
+					for _, mapEntity := range tileEnt {
+						pos := mapEntity.GetPosition()
+						if (int(pos.SubTileOffset().X()) != subX) || (int(pos.SubTileOffset().Y()) != subY) {
+							continue
+						}
+
+						target.PushTranslation(mr.viewport.GetTranslationScreen())
+						mapEntity.Render(target)
+						target.Pop()
+					}
+				}
 			}
 
 			mr.viewport.PopTranslation()
@@ -203,8 +246,10 @@ func (mr *MapRenderer) renderPass3(target d2interface.Surface, startX, startY, e
 			mr.viewport.PushTranslationWorld(float64(tileX), float64(tileY))
 			mr.renderTilePass2(tile, target)
 
+			tileEnt := make([]d2interface.MapEntity, 0)
+
 			// TODO: Do not loop over every entity every frame
-			for _, mapEntity := range *mr.mapEngine.Entities() {
+			for _, mapEntity := range mr.mapEngine.Entities() {
 				pos := mapEntity.GetPosition()
 				vec := pos.World()
 				entityX, entityY := vec.X(), vec.Y()
@@ -217,9 +262,22 @@ func (mr *MapRenderer) renderPass3(target d2interface.Surface, startX, startY, e
 					continue
 				}
 
-				target.PushTranslation(mr.viewport.GetTranslationScreen())
-				mapEntity.Render(target)
-				target.Pop()
+				tileEnt = append(tileEnt, mapEntity)
+			}
+
+			for subY := 0; subY < 5; subY++ {
+				for subX := 0; subX < 5; subX++ {
+					for _, mapEntity := range tileEnt {
+						pos := mapEntity.GetPosition()
+						if (int(pos.SubTileOffset().X()) != subX) || (int(pos.SubTileOffset().Y()) != subY) {
+							continue
+						}
+
+						target.PushTranslation(mr.viewport.GetTranslationScreen())
+						mapEntity.Render(target)
+						target.Pop()
+					}
+				}
 			}
 
 			mr.viewport.PopTranslation()
@@ -327,9 +385,10 @@ func (mr *MapRenderer) renderShadow(tile d2ds1.FloorShadowRecord, target d2inter
 	defer mr.viewport.PushTranslationOrtho(-80, float64(tile.YAdjust)).PopTranslation()
 
 	target.PushTranslation(mr.viewport.GetTranslationScreen())
-	target.PushColor(color.RGBA{R: 255, G: 255, B: 255, A: 160}) //nolint:gomnd // Not a magic number...
+	defer target.Pop()
 
-	defer target.PopN(2)
+	target.PushColor(color.RGBA{R: 255, G: 255, B: 255, A: 160}) //nolint:gomnd // Not a magic number...
+	defer target.Pop()
 
 	if err := target.Render(img); err != nil {
 		fmt.Printf("failed to render the shadow, err: %v\n", err)
@@ -346,33 +405,79 @@ func (mr *MapRenderer) renderMapDebug(mapDebugVisLevel int, target d2interface.S
 	}
 }
 
+//nolint:funlen // doesn't make sense to split this function
 func (mr *MapRenderer) renderEntityDebug(target d2interface.Surface) {
-	entities := *mr.mapEngine.Entities()
+	entities := mr.mapEngine.Entities()
 
 	for idx := range entities {
 		e := entities[idx]
 		pos := e.GetPosition()
 		world := pos
-		x, y := world.X()/5, world.Y()/5
+		x, y := world.X()/subtilesPerTile, world.Y()/subtilesPerTile
 		velocity := e.GetVelocity()
 		velocity = *velocity.Clone()
 		vx, vy := mr.viewport.WorldToOrtho(velocity.X(), velocity.Y())
 		screenX, screenY := mr.viewport.WorldToScreen(x, y)
 
-		offX, offY := 40, -40
+		offX, offY := dbgOffsetXY, -dbgOffsetXY
 
+		entScreenXf, entScreenYf := mr.WorldToScreenF(e.GetPositionF())
+		entScreenX := int(math.Floor(entScreenXf))
+		entScreenY := int(math.Floor(entScreenYf))
+		entityWidth, entityHeight := e.GetSize()
+		halfWidth, halfHeight := entityWidth/two, entityHeight/two
+		l, r := entScreenX-halfWidth, entScreenX+halfWidth
+		t, b := entScreenY-halfHeight, entScreenY+halfHeight
+		mx, my := mr.renderer.GetCursorPos()
+		xWithin := (l <= mx) && (r >= mx)
+		yWithin := (t <= my) && (b >= my)
+		within := xWithin && yWithin
+
+		boxLineColor := d2util.Color(magentaFullOpacity)
+		boxHoverColor := d2util.Color(yellowFullOpacity)
+
+		boxColor := boxLineColor
+
+		if within {
+			boxColor = boxHoverColor
+		}
+
+		stack := 0
+		// box
 		mr.viewport.PushTranslationWorld(x, y)
+
 		target.PushTranslation(screenX, screenY)
-		target.DrawLine(offX, offY, color.RGBA{255, 255, 255, 128})
-		target.PushTranslation(offX+10, offY-20)
-		target.PushTranslation(-10, -10)
-		target.DrawRect(200, 50, color.RGBA{0, 0, 0, 64})
-		target.Pop()
-		target.DrawTextf("World (%.2f, %.2f)\nVelocity (%.2f, %.2f)", x, y, vx, vy)
-		target.Pop()
-		target.DrawLine(int(vx), int(vy), color.RGBA{64, 255, 0, 255})
-		target.Pop()
+		stack++
+
+		target.PushTranslation(-halfWidth, -halfHeight)
+		stack++
+
+		target.DrawLine(0, entityHeight, boxColor)
+		target.DrawLine(entityWidth, 0, boxColor)
+
+		target.PushTranslation(entityWidth, entityHeight)
+		stack++
+
+		target.DrawLine(-entityWidth, 0, boxColor)
+		target.DrawLine(0, -entityHeight, boxColor)
+		target.PopN(stack)
 		mr.viewport.PopTranslation()
+
+		// hover
+		if within {
+			mr.viewport.PushTranslationWorld(x, y)
+			target.PushTranslation(screenX, screenY)
+			target.DrawLine(offX, offY, d2util.Color(whiteHalfOpacity))
+			target.PushTranslation(offX+dbgBoxPadding, offY-dbgBoxPadding*two)
+			target.PushTranslation(-dbgOffsetXY, -dbgOffsetXY)
+			target.DrawRect(dbgBoxWidth, dbgBoxHeight, d2util.Color(blackQuarterOpacity))
+			target.Pop()
+			target.DrawTextf("World (%.2f, %.2f)\nVelocity (%.2f, %.2f)", x, y, vx, vy)
+			target.Pop()
+			target.DrawLine(int(vx), int(vy), d2util.Color(lightGreenFullOpacity))
+			target.Pop()
+			mr.viewport.PopTranslation()
+		}
 	}
 }
 
@@ -387,9 +492,9 @@ func (mr *MapRenderer) WorldToScreenF(x, y float64) (screenX, screenY float64) {
 }
 
 func (mr *MapRenderer) renderTileDebug(ax, ay, debugVisLevel int, target d2interface.Surface) {
-	subTileColor := color.RGBA{R: 80, G: 80, B: 255, A: 50}
-	tileColor := color.RGBA{R: 255, G: 255, B: 255, A: 100}
-	tileCollisionColor := color.RGBA{R: 128, G: 0, B: 0, A: 100}
+	subTileColor := d2util.Color(lightBlueQuarterOpacity)
+	tileColor := d2util.Color(whiteQuarterOpacity)
+	tileCollisionColor := d2util.Color(redQuarterOpacity)
 
 	screenX1, screenY1 := mr.viewport.WorldToScreen(float64(ax), float64(ay))
 	screenX2, screenY2 := mr.viewport.WorldToScreen(float64(ax+1), float64(ay))
@@ -406,15 +511,15 @@ func (mr *MapRenderer) renderTileDebug(ax, ay, debugVisLevel int, target d2inter
 
 	if debugVisLevel > 1 {
 		for i := 1; i <= 4; i++ {
-			x2 := i * 16
-			y2 := i * 8
+			x2 := i * orthoSubTileWidth
+			y2 := i * orthoSubTileHeight
 
 			target.PushTranslation(-x2, y2)
-			target.DrawLine(80, 40, subTileColor)
+			target.DrawLine(orthoTileWidth, orthoTileHeight, subTileColor)
 			target.Pop()
 
 			target.PushTranslation(x2, y2)
-			target.DrawLine(-80, 40, subTileColor)
+			target.DrawLine(-orthoTileWidth, orthoTileHeight, subTileColor)
 			target.Pop()
 		}
 
@@ -422,7 +527,7 @@ func (mr *MapRenderer) renderTileDebug(ax, ay, debugVisLevel int, target d2inter
 
 		for i, wall := range tile.Components.Walls {
 			if wall.Type.Special() {
-				target.PushTranslation(-20, 10+(i+1)*14)
+				target.PushTranslation(-20, 10+(i+1)*14) // what are these magic numbers??
 				target.DrawTextf("s: %v-%v", wall.Style, wall.Sequence)
 				target.Pop()
 			}
@@ -430,14 +535,14 @@ func (mr *MapRenderer) renderTileDebug(ax, ay, debugVisLevel int, target d2inter
 
 		for yy := 0; yy < 5; yy++ {
 			for xx := 0; xx < 5; xx++ {
-				isoX := (xx - yy) * 16
-				isoY := (xx + yy) * 8
+				isoX := (xx - yy) * orthoSubTileWidth
+				isoY := (xx + yy) * orthoSubTileHeight
 
 				blocked := tile.GetSubTileFlags(xx, yy).BlockWalk
 
 				if blocked {
-					target.PushTranslation(isoX-3, isoY+4)
-					target.DrawRect(5, 5, tileCollisionColor)
+					target.PushTranslation(isoX+dbgCollisionOffsetX, isoY+dbgCollisionOffsetY)
+					target.DrawRect(dbgCollisionSize, dbgCollisionSize, tileCollisionColor)
 					target.Pop()
 				}
 			}
@@ -461,7 +566,8 @@ func (mr *MapRenderer) Advance(elapsed float64) {
 	mr.Camera.Advance(elapsed)
 }
 
-func loadPaletteForAct(levelType d2enum.RegionIdType) (d2interface.Palette, error) {
+func (mr *MapRenderer) loadPaletteForAct(levelType d2enum.RegionIdType) (d2interface.Palette,
+	error) {
 	var palettePath string
 
 	switch levelType {
@@ -484,7 +590,7 @@ func loadPaletteForAct(levelType d2enum.RegionIdType) (d2interface.Palette, erro
 		return nil, errors.New("failed to find palette for region")
 	}
 
-	return d2asset.LoadPalette(palettePath)
+	return mr.asset.LoadPalette(palettePath)
 }
 
 // ViewportToLeft moves the viewport to the left.

@@ -1,6 +1,11 @@
 package d2netpacket
 
-import "github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket/d2netpackettype"
+import (
+	"encoding/json"
+	"log"
+
+	"github.com/OpenDiablo2/OpenDiablo2/d2networking/d2netpacket/d2netpackettype"
+)
 
 // MovePlayerPacket contains a movement command for a specific player entity.
 // It is sent by the server to move a player entity on a client.
@@ -16,14 +21,29 @@ type MovePlayerPacket struct {
 // CreateMovePlayerPacket returns a NetPacket which declares a MovePlayerPacket
 // with the given ID and movement command.
 func CreateMovePlayerPacket(playerID string, startX, startY, destX, destY float64) NetPacket {
+	movePlayerPacket := MovePlayerPacket{
+		PlayerID: playerID,
+		StartX:   startX,
+		StartY:   startY,
+		DestX:    destX,
+		DestY:    destY,
+	}
+	b, err := json.Marshal(movePlayerPacket)
+	if err != nil {
+		log.Print(err)
+	}
+
 	return NetPacket{
 		PacketType: d2netpackettype.MovePlayer,
-		PacketData: MovePlayerPacket{
-			PlayerID: playerID,
-			StartX:   startX,
-			StartY:   startY,
-			DestX:    destX,
-			DestY:    destY,
-		},
+		PacketData: b,
 	}
+}
+
+func UnmarshalMovePlayer(packet []byte) (MovePlayerPacket, error) {
+	var p MovePlayerPacket
+	if err := json.Unmarshal(packet, &p); err != nil {
+		return p, err
+	}
+
+	return p, nil
 }

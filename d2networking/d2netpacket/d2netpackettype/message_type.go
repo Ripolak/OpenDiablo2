@@ -1,5 +1,10 @@
 package d2netpackettype
 
+import (
+	"encoding/json"
+	"log"
+)
+
 // NetPacketType is an enum referring to all packet types in package
 // d2netpacket.
 type NetPacketType uint32
@@ -24,6 +29,9 @@ const (
 	Pong                                                 // Responds to a Ping packet
 	ServerClosed                                         // Sent by the local host when it has closed the server
 	CastSkill                                            // Sent by client or server, indicates entity casting skill
+	SpawnItem                                            // Sent by server
+
+	UnknownPacketType = 666
 )
 
 func (n NetPacketType) String() string {
@@ -38,7 +46,17 @@ func (n NetPacketType) String() string {
 		Pong:                            "Pong",
 		ServerClosed:                    "ServerClosed",
 		CastSkill:                       "CastSkill",
+		SpawnItem:                       "SpawnItem",
 	}
 
 	return strings[n]
+}
+
+func (n NetPacketType) MarshalPacket() []byte {
+	p, err := json.Marshal(n)
+	if err != nil {
+		log.Print(err)
+	}
+
+	return p
 }

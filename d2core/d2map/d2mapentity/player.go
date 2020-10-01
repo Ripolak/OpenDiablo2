@@ -3,11 +3,9 @@ package d2mapentity
 import (
 	"fmt"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2datadict"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2inventory"
@@ -16,78 +14,30 @@ import (
 // Player is the player character entity.
 type Player struct {
 	mapEntity
-	ID            string
-	name          string
-	animationMode string
-	composite     *d2asset.Composite
-	Equipment     *d2inventory.CharacterEquipment
-	Stats         *d2hero.HeroStatsState
-	Class         d2enum.Hero
-	lastPathSize  int
-	isInTown      bool
-	isRunToggled  bool
-	isRunning     bool
-	isCasting     bool
-
-	// nameLabel     d2ui.Label
-
+	name              string
+	animationMode     string
+	composite         *d2asset.Composite
+	Equipment         *d2inventory.CharacterEquipment
+	Stats             *d2hero.HeroStatsState
+	Skills            map[int]*d2hero.HeroSkill
+	LeftSkill         *d2hero.HeroSkill
+	RightSkill        *d2hero.HeroSkill
+	Class             d2enum.Hero
+	lastPathSize      int
+	isInTown          bool
+	isRunToggled      bool
+	isRunning         bool
+	isCasting         bool
+	onFinishedCasting func()
 }
 
 // run speed should be walkspeed * 1.5, since in the original game it is 6 yards walk and 9 yards run.
 const baseWalkSpeed = 6.0
 const baseRunSpeed = 9.0
 
-// CreatePlayer creates a new player entity and returns a pointer to it.
-func CreatePlayer(id, name string, x, y, direction int, heroType d2enum.Hero,
-	stats *d2hero.HeroStatsState, equipment *d2inventory.CharacterEquipment) *Player {
-	layerEquipment := &[d2enum.CompositeTypeMax]string{
-		d2enum.CompositeTypeHead:      equipment.Head.GetArmorClass(),
-		d2enum.CompositeTypeTorso:     equipment.Torso.GetArmorClass(),
-		d2enum.CompositeTypeLegs:      equipment.Legs.GetArmorClass(),
-		d2enum.CompositeTypeRightArm:  equipment.RightArm.GetArmorClass(),
-		d2enum.CompositeTypeLeftArm:   equipment.LeftArm.GetArmorClass(),
-		d2enum.CompositeTypeRightHand: equipment.RightHand.GetItemCode(),
-		d2enum.CompositeTypeLeftHand:  equipment.LeftHand.GetItemCode(),
-		d2enum.CompositeTypeShield:    equipment.Shield.GetItemCode(),
-	}
-
-	composite, err := d2asset.LoadComposite(d2enum.ObjectTypePlayer, heroType.GetToken(),
-		d2resource.PaletteUnits)
-	if err != nil {
-		panic(err)
-	}
-
-	stats.NextLevelExp = d2datadict.GetExperienceBreakpoint(heroType, stats.Level)
-	stats.Stamina = stats.MaxStamina
-
-	result := &Player{
-		ID:        id,
-		mapEntity: newMapEntity(x, y),
-		composite: composite,
-		Equipment: equipment,
-		Stats:     stats,
-		name:      name,
-		Class:     heroType,
-		//nameLabel:    d2ui.CreateLabel(d2resource.FontFormal11, d2resource.PaletteStatic),
-		isRunToggled: true,
-		isInTown:     true,
-		isRunning:    true,
-	}
-	result.SetSpeed(baseRunSpeed)
-	result.mapEntity.directioner = result.rotate
-	err = composite.SetMode(d2enum.PlayerAnimationModeTownNeutral, equipment.RightHand.GetWeaponClass())
-
-	if err != nil {
-		panic(err)
-	}
-
-	composite.SetDirection(direction)
-
-	if err := composite.Equip(layerEquipment); err != nil {
-		fmt.Printf("failed to equip, err: %v\n", err)
-	}
-
-	return result
+// ID returns the Player uuid
+func (p *Player) ID() string {
+	return p.mapEntity.uuid
 }
 
 // SetIsInTown sets a flag indicating that the player is in town.
@@ -135,13 +85,18 @@ func (p *Player) Advance(tickTime float64) {
 
 	if p.IsCasting() && p.composite.GetPlayedCount() >= 1 {
 		p.isCasting = false
+		if p.onFinishedCasting != nil {
+			p.onFinishedCasting()
+			p.onFinishedCasting = nil
+		}
+
 		if err := p.SetAnimationMode(p.GetAnimationMode()); err != nil {
 			fmt.Printf("failed to set animationMode to: %d, err: %v\n", p.GetAnimationMode(), err)
 		}
 	}
 
 	if err := p.composite.Advance(tickTime); err != nil {
-		fmt.Printf("failed to advance composite animation of player: %s, err: %v\n", p.ID, err)
+		fmt.Printf("failed to advance composite animation of player: %s, err: %v\n", p.ID(), err)
 	}
 
 	if p.lastPathSize != len(p.path) {
@@ -164,7 +119,7 @@ func (p *Player) Render(target d2interface.Surface) {
 	defer target.Pop()
 
 	if err := p.composite.Render(target); err != nil {
-		fmt.Printf("failed to render the composite of player: %s, err: %v\n", p.ID, err)
+		fmt.Printf("failed to render the composite of player: %s, err: %v\n", p.ID(), err)
 	}
 }
 
@@ -213,6 +168,11 @@ func (p *Player) rotate(direction int) {
 	}
 }
 
+// SetDirection will rotate the player and change the animation
+func (p *Player) SetDirection(direction int) {
+	p.rotate(direction)
+}
+
 // Name returns the player name.
 func (p *Player) Name() string {
 	return p.name
@@ -223,12 +183,14 @@ func (p *Player) IsCasting() bool {
 	return p.isCasting
 }
 
-// SetCasting sets a flag indicating the player is casting a skill and
+// StartCasting sets a flag indicating the player is casting a skill and
 // sets the animation mode to the casting animation.
-func (p *Player) SetCasting() {
+func (p *Player) StartCasting(onFinishedCasting func()) {
 	p.isCasting = true
+	p.onFinishedCasting = onFinishedCasting
 	if err := p.SetAnimationMode(d2enum.PlayerAnimationModeCast); err != nil {
-		fmt.Printf("failed to set animationMode of player: %s to: %d, err: %v\n", p.ID, d2enum.PlayerAnimationModeCast, err)
+		fmtStr := "failed to set animationMode of player: %s to: %d, err: %v\n"
+		fmt.Printf(fmtStr, p.ID(), d2enum.PlayerAnimationModeCast, err)
 	}
 }
 
@@ -246,4 +208,13 @@ func (p *Player) GetPosition() d2vector.Position {
 // GetVelocity returns the entity's velocity vector
 func (p *Player) GetVelocity() d2vector.Vector {
 	return p.mapEntity.velocity
+}
+
+// GetSize returns the current frame size
+func (p *Player) GetSize() (width, height int) {
+	width, height = p.composite.GetSize()
+	// hack: we need to get full size of composite animations, currently only gets legs
+	height = (height * 2) - (height / 2)
+
+	return width, height
 }

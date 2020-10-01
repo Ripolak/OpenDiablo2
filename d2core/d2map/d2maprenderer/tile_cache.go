@@ -3,15 +3,20 @@ package d2maprenderer
 import (
 	"log"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2util"
+
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2ds1"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2fileformats/d2dt1"
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math"
 )
 
 func (mr *MapRenderer) generateTileCache() {
-	mr.palette, _ = loadPaletteForAct(d2enum.RegionIdType(mr.mapEngine.LevelType().ID))
+	var err error
+	mr.palette, err = mr.loadPaletteForAct(d2enum.RegionIdType(mr.mapEngine.LevelType().ID))
+	if err != nil {
+		log.Print(err)
+	}
 
 	tiles := *mr.mapEngine.Tiles()
 	for idx := range tiles {
@@ -77,17 +82,24 @@ func (mr *MapRenderer) generateFloorCache(tile *d2ds1.FloorShadowRecord) {
 		tileYMinimum := int32(0)
 
 		for _, block := range tileData[i].Blocks {
-			tileYMinimum = d2common.MinInt32(tileYMinimum, int32(block.Y))
+			tileYMinimum = d2math.MinInt32(tileYMinimum, int32(block.Y))
 		}
 
-		tileYOffset := d2common.AbsInt32(tileYMinimum)
-		tileHeight := d2common.AbsInt32(tileData[i].Height)
-		image, _ := mr.renderer.NewSurface(int(tileData[i].Width), int(tileHeight), d2enum.FilterNearest)
+		tileYOffset := d2math.AbsInt32(tileYMinimum)
+		tileHeight := d2math.AbsInt32(tileData[i].Height)
+		image, err := mr.renderer.NewSurface(int(tileData[i].Width), int(tileHeight), d2enum.FilterNearest)
+		if err != nil {
+			log.Print(err)
+		}
+
 		indexData := make([]byte, tileData[i].Width*tileHeight)
 		d2dt1.DecodeTileGfxData(tileData[i].Blocks, &indexData, tileYOffset, tileData[i].Width)
-		pixels := d2asset.ImgIndexToRGBA(indexData, mr.palette)
+		pixels := d2util.ImgIndexToRGBA(indexData, mr.palette)
 
-		_ = image.ReplacePixels(pixels)
+		err = image.ReplacePixels(pixels)
+		if err != nil {
+			log.Print(err)
+		}
 		mr.setImageCacheRecord(tile.Style, tile.Sequence, 0, tileIndex, image)
 	}
 }
@@ -111,8 +123,8 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.FloorShadowRecord) {
 	tileMaxY := int32(0)
 
 	for _, block := range tileData.Blocks {
-		tileMinY = d2common.MinInt32(tileMinY, int32(block.Y))
-		tileMaxY = d2common.MaxInt32(tileMaxY, int32(block.Y+32))
+		tileMinY = d2math.MinInt32(tileMinY, int32(block.Y))
+		tileMaxY = d2math.MaxInt32(tileMaxY, int32(block.Y+32))
 	}
 
 	tileYOffset := -tileMinY
@@ -124,11 +136,20 @@ func (mr *MapRenderer) generateShadowCache(tile *d2ds1.FloorShadowRecord) {
 		return
 	}
 
-	image, _ := mr.renderer.NewSurface(int(tileData.Width), tileHeight, d2enum.FilterNearest)
+	image, err := mr.renderer.NewSurface(int(tileData.Width), tileHeight, d2enum.FilterNearest)
+	if err != nil {
+		log.Print(err)
+	}
+
 	indexData := make([]byte, tileData.Width*int32(tileHeight))
 	d2dt1.DecodeTileGfxData(tileData.Blocks, &indexData, tileYOffset, tileData.Width)
-	pixels := d2asset.ImgIndexToRGBA(indexData, mr.palette)
-	_ = image.ReplacePixels(pixels)
+	pixels := d2util.ImgIndexToRGBA(indexData, mr.palette)
+
+	err = image.ReplacePixels(pixels)
+	if err != nil {
+		log.Print(err)
+	}
+
 	mr.setImageCacheRecord(tile.Style, tile.Sequence, 13, tile.RandomIndex, image)
 }
 
@@ -160,11 +181,11 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.WallRecord) {
 	}
 
 	for _, block := range target.Blocks {
-		tileMinY = d2common.MinInt32(tileMinY, int32(block.Y))
-		tileMaxY = d2common.MaxInt32(tileMaxY, int32(block.Y+32))
+		tileMinY = d2math.MinInt32(tileMinY, int32(block.Y))
+		tileMaxY = d2math.MaxInt32(tileMaxY, int32(block.Y+32))
 	}
 
-	realHeight := d2common.MaxInt32(d2common.AbsInt32(tileData.Height), tileMaxY-tileMinY)
+	realHeight := d2math.MaxInt32(d2math.AbsInt32(tileData.Height), tileMaxY-tileMinY)
 	tileYOffset := -tileMinY
 
 	if tile.Type == 15 {
@@ -183,7 +204,11 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.WallRecord) {
 		return
 	}
 
-	image, _ := mr.renderer.NewSurface(160, int(realHeight), d2enum.FilterNearest)
+	image, err := mr.renderer.NewSurface(160, int(realHeight), d2enum.FilterNearest)
+	if err != nil {
+		log.Print(err)
+	}
+
 	indexData := make([]byte, 160*realHeight)
 
 	d2dt1.DecodeTileGfxData(tileData.Blocks, &indexData, tileYOffset, 160)
@@ -192,7 +217,7 @@ func (mr *MapRenderer) generateWallCache(tile *d2ds1.WallRecord) {
 		d2dt1.DecodeTileGfxData(newTileData.Blocks, &indexData, tileYOffset, 160)
 	}
 
-	pixels := d2asset.ImgIndexToRGBA(indexData, mr.palette)
+	pixels := d2util.ImgIndexToRGBA(indexData, mr.palette)
 
 	if err := image.ReplacePixels(pixels); err != nil {
 		log.Panicf(err.Error())

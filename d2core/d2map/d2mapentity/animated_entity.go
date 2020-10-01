@@ -9,33 +9,31 @@ import (
 // AnimatedEntity represents an animation that can be projected onto the map.
 type AnimatedEntity struct {
 	mapEntity
+	animation d2interface.Animation
+
 	direction   int
 	action      int
 	repetitions int
 
-	animation d2interface.Animation
-}
-
-// CreateAnimatedEntity creates an instance of AnimatedEntity
-func CreateAnimatedEntity(x, y int, animation d2interface.Animation) *AnimatedEntity {
-	entity := &AnimatedEntity{
-		mapEntity: newMapEntity(x, y),
-		animation: animation,
-	}
-	entity.mapEntity.directioner = entity.rotate
-
-	return entity
+	highlight bool
 }
 
 // Render draws this animated entity onto the target
 func (ae *AnimatedEntity) Render(target d2interface.Surface) {
 	renderOffset := ae.Position.RenderOffset()
-	target.PushTranslation(
-		int((renderOffset.X()-renderOffset.Y())*16),
-		int(((renderOffset.X()+renderOffset.Y())*8)-5),
-	)
+	ox, oy := renderOffset.X(), renderOffset.Y()
+	tx, ty := int((ox-oy)*16), int((ox+oy)*8)-5
+
+	target.PushTranslation(tx, ty)
 
 	defer target.Pop()
+
+	if ae.highlight {
+		target.PushBrightness(2)
+		defer target.Pop()
+
+		ae.highlight = false
+	}
 
 	if err := ae.animation.Render(target); err != nil {
 		fmt.Printf("failed to render animated entity, err: %v\n", err)
@@ -62,4 +60,9 @@ func (ae *AnimatedEntity) Advance(elapsed float64) {
 	if err := ae.animation.Advance(elapsed); err != nil {
 		fmt.Printf("failed to advance the animation, err: %v\n", err)
 	}
+}
+
+// SetHighlight sets the highlight state of the animated entity
+func (ae *AnimatedEntity) SetHighlight(set bool) {
+	ae.highlight = set
 }

@@ -1,12 +1,20 @@
 package d2dc6
 
 import (
-	"github.com/OpenDiablo2/OpenDiablo2/d2common"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2datautils"
 )
 
 const (
 	endOfScanLine = 0x80
 	maxRunLength  = 0x7f
+)
+
+type scanlineState int
+
+const (
+	endOfLine scanlineState = iota
+	runOfTransparentPixels
+	runOfOpaquePixels
 )
 
 // DC6 represents a DC6 file.
@@ -28,7 +36,7 @@ func Load(data []byte) (*DC6, error) {
 		terminatorSize  = 3
 	)
 
-	r := d2common.CreateStreamReader(data)
+	r := d2datautils.CreateStreamReader(data)
 
 	var dc DC6
 	dc.Version = r.GetInt32()
@@ -75,22 +83,24 @@ func (d *DC6) DecodeFrame(frameIndex int) []byte {
 	y := int(frame.Height) - 1
 	offset := 0
 
+loop: // this is a label for the loop, so the switch can break the loop (and not the switch)
 	for {
 		b := int(frame.FrameData[offset])
 		offset++
 
-		if b == endOfScanLine {
+		switch scanlineType(b) {
+		case endOfLine:
 			if y == 0 {
-				break
+				break loop
 			}
 
 			y--
 
 			x = 0
-		} else if b&endOfScanLine > 0 {
+		case runOfTransparentPixels:
 			transparentPixels := b & maxRunLength
 			x += transparentPixels
-		} else {
+		case runOfOpaquePixels:
 			for i := 0; i < b; i++ {
 				indexData[x+y*int(frame.Width)+i] = frame.FrameData[offset]
 				offset++
@@ -101,4 +111,16 @@ func (d *DC6) DecodeFrame(frameIndex int) []byte {
 	}
 
 	return indexData
+}
+
+func scanlineType(b int) scanlineState {
+	if b == endOfScanLine {
+		return endOfLine
+	}
+
+	if (b & endOfScanLine) > 0 {
+		return runOfTransparentPixels
+	}
+
+	return runOfOpaquePixels
 }

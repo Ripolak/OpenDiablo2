@@ -2,10 +2,12 @@ package d2gamescreen
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2gui"
 )
 
@@ -70,6 +72,8 @@ type EscapeMenu struct {
 	renderer      d2interface.Renderer
 	audioProvider d2interface.AudioProvider
 	navigator     Navigator
+	guiManager    *d2gui.GuiManager
+	assetManager  *d2asset.AssetManager
 }
 
 type layout struct {
@@ -123,11 +127,18 @@ type actionableElement interface {
 }
 
 // NewEscapeMenu creates a new escape menu
-func NewEscapeMenu(navigator Navigator, renderer d2interface.Renderer, audioProvider d2interface.AudioProvider) *EscapeMenu {
+func NewEscapeMenu(navigator Navigator,
+	renderer d2interface.Renderer,
+	audioProvider d2interface.AudioProvider,
+	guiManager *d2gui.GuiManager,
+	assetManager *d2asset.AssetManager,
+) *EscapeMenu {
 	m := &EscapeMenu{
 		audioProvider: audioProvider,
 		renderer:      renderer,
 		navigator:     navigator,
+		guiManager:    guiManager,
+		assetManager:  assetManager,
 	}
 
 	m.layouts = []*layout{
@@ -206,7 +217,7 @@ func (m *EscapeMenu) newConfigureControlsLayout() *layout {
 }
 
 func (m *EscapeMenu) wrapLayout(fn func(*layout)) *layout {
-	wrapper := d2gui.CreateLayout(m.renderer, d2gui.PositionTypeHorizontal)
+	wrapper := d2gui.CreateLayout(m.renderer, d2gui.PositionTypeHorizontal, m.assetManager)
 	wrapper.SetVerticalAlign(d2gui.VerticalAlignMiddle)
 	wrapper.AddSpacerDynamic()
 
@@ -215,7 +226,12 @@ func (m *EscapeMenu) wrapLayout(fn func(*layout)) *layout {
 
 	left := center.AddLayout(d2gui.PositionTypeHorizontal)
 	left.SetSize(sidePanelsSize, 0)
-	leftPent, _ := left.AddAnimatedSprite(d2resource.PentSpin, d2resource.PaletteUnits, d2gui.DirectionForward)
+	leftPent, err := left.AddAnimatedSprite(d2resource.PentSpin, d2resource.PaletteUnits, d2gui.DirectionForward)
+	if err != nil {
+		log.Print(err)
+		return nil
+	}
+
 	m.leftPent = leftPent
 
 	// wrap the base layout so we can pass values around more easily
@@ -229,7 +245,12 @@ func (m *EscapeMenu) wrapLayout(fn func(*layout)) *layout {
 	// For some reason, aligning the panel to the right won't align the pentagram, so we need to add a static spacer.
 	right.AddSpacerStatic(sidePanelsSize-pentSize, 0)
 	right.SetSize(sidePanelsSize, 0)
-	rightPent, _ := right.AddAnimatedSprite(d2resource.PentSpin, d2resource.PaletteUnits, d2gui.DirectionBackward)
+	rightPent, err := right.AddAnimatedSprite(d2resource.PentSpin, d2resource.PaletteUnits, d2gui.DirectionBackward)
+	if err != nil {
+		log.Print(err)
+		return nil
+	}
+
 	m.rightPent = rightPent
 
 	wrapper.AddSpacerDynamic()
@@ -252,7 +273,11 @@ func (m *EscapeMenu) addTitle(l *layout, text string) {
 }
 
 func (m *EscapeMenu) addBigSelectionLabel(l *layout, text string, targetLayout layoutID) {
-	guiLabel, _ := l.AddLabel(text, d2gui.FontStyle42Units)
+	guiLabel, err := l.AddLabel(text, d2gui.FontStyle42Units)
+	if err != nil {
+		log.Print(err)
+	}
+
 	label := &showLayoutLabel{Label: guiLabel, target: targetLayout, showLayout: m.showLayout}
 	label.SetMouseClickHandler(func(_ d2interface.MouseEvent) {
 		label.Trigger()
@@ -269,7 +294,11 @@ func (m *EscapeMenu) addBigSelectionLabel(l *layout, text string, targetLayout l
 
 func (m *EscapeMenu) addPreviousMenuLabel(l *layout) {
 	l.AddSpacerStatic(spacerWidth, labelGutter)
-	guiLabel, _ := l.AddLabel("PREVIOUS MENU", d2gui.FontStyle30Units)
+	guiLabel, err := l.AddLabel("PREVIOUS MENU", d2gui.FontStyle30Units)
+	if err != nil {
+		log.Print(err)
+	}
+
 	label := &showLayoutLabel{Label: guiLabel, target: optionsLayoutID, showLayout: m.showLayout}
 	label.SetMouseClickHandler(func(_ d2interface.MouseEvent) {
 		label.Trigger()
@@ -300,7 +329,11 @@ func (m *EscapeMenu) addEnumLabel(l *layout, optID optionID, text string, values
 		m.onHoverElement(elID)
 	})
 	layout.AddSpacerDynamic()
-	guiLabel, _ := layout.AddLabel(values[0], d2gui.FontStyle30Units)
+	guiLabel, err := layout.AddLabel(values[0], d2gui.FontStyle30Units)
+	if err != nil {
+		log.Print(err)
+	}
+
 	label := &enumLabel{
 		Layout:            guiLayout,
 		textChangingLabel: guiLabel,
@@ -319,7 +352,11 @@ func (m *EscapeMenu) addEnumLabel(l *layout, optID optionID, text string, values
 }
 
 func (m *EscapeMenu) onLoad() {
-	m.selectSound, _ = m.audioProvider.LoadSoundEffect(d2resource.SFXCursorSelect)
+	var err error
+	m.selectSound, err = m.audioProvider.LoadSound(d2resource.SFXCursorSelect, false, false)
+	if err != nil {
+		log.Print(err)
+	}
 }
 
 func (m *EscapeMenu) onEscKey() {
@@ -346,7 +383,7 @@ func (m *EscapeMenu) onEscKey() {
 func (m *EscapeMenu) close() {
 	m.isOpen = false
 
-	d2gui.SetLayout(nil)
+	m.guiManager.SetLayout(nil)
 }
 
 func (m *EscapeMenu) open() {
@@ -393,7 +430,7 @@ func (m *EscapeMenu) setLayout(id layoutID) {
 	m.rightPent = m.layouts[id].rightPent
 	m.currentLayout = id
 	m.layouts[id].currentEl = 0
-	d2gui.SetLayout(m.layouts[id].Layout)
+	m.guiManager.SetLayout(m.layouts[id].Layout)
 	m.onHoverElement(0)
 }
 

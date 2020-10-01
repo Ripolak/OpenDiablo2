@@ -1,10 +1,11 @@
 package d2ds1
 
 import (
-	"github.com/OpenDiablo2/OpenDiablo2/d2common"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2datautils"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
 )
 
 const maxActNumber = 5
@@ -12,7 +13,7 @@ const maxActNumber = 5
 // DS1 represents the "stamp" data that is used to build up maps.
 type DS1 struct {
 	Files                      []string            // FilePtr table of file string pointers
-	Objects                    []d2data.Object     // Objects
+	Objects                    []Object            // Objects
 	Tiles                      [][]TileRecord      // The tile data for the DS1
 	SubstitutionGroups         []SubstitutionGroup // Substitution groups for the DS1
 	Version                    int32               // The version of the DS1
@@ -36,13 +37,13 @@ func LoadDS1(fileData []byte) (*DS1, error) {
 		NumberOfShadowLayers:       1,
 		NumberOfSubstitutionLayers: 0,
 	}
-	br := d2common.CreateStreamReader(fileData)
+	br := d2datautils.CreateStreamReader(fileData)
 	ds1.Version = br.GetInt32()
 	ds1.Width = br.GetInt32() + 1
 	ds1.Height = br.GetInt32() + 1
 
 	if ds1.Version >= 8 { //nolint:gomnd // Version number
-		ds1.Act = d2common.MinInt32(maxActNumber, br.GetInt32()+1)
+		ds1.Act = d2math.MinInt32(maxActNumber, br.GetInt32()+1)
 	}
 
 	if ds1.Version >= 10 { //nolint:gomnd // Version number
@@ -107,13 +108,13 @@ func LoadDS1(fileData []byte) (*DS1, error) {
 	return ds1, nil
 }
 
-func (ds1 *DS1) loadObjects(br *d2common.StreamReader) {
+func (ds1 *DS1) loadObjects(br *d2datautils.StreamReader) {
 	if ds1.Version >= 2 { //nolint:gomnd // Version number
 		numberOfObjects := br.GetInt32()
-		ds1.Objects = make([]d2data.Object, numberOfObjects)
+		ds1.Objects = make([]Object, numberOfObjects)
 
 		for objIdx := 0; objIdx < int(numberOfObjects); objIdx++ {
-			newObject := d2data.Object{}
+			newObject := Object{}
 			newObject.Type = int(br.GetInt32())
 			newObject.ID = int(br.GetInt32())
 			newObject.X = int(br.GetInt32())
@@ -123,11 +124,11 @@ func (ds1 *DS1) loadObjects(br *d2common.StreamReader) {
 			ds1.Objects[objIdx] = newObject
 		}
 	} else {
-		ds1.Objects = make([]d2data.Object, 0)
+		ds1.Objects = make([]Object, 0)
 	}
 }
 
-func (ds1 *DS1) loadSubstitutions(br *d2common.StreamReader) {
+func (ds1 *DS1) loadSubstitutions(br *d2datautils.StreamReader) {
 	if ds1.Version >= 12 && (ds1.SubstitutionType == 1 || ds1.SubstitutionType == 2) {
 		if ds1.Version >= 18 { //nolint:gomnd // Version number
 			br.GetUInt32()
@@ -188,7 +189,7 @@ func (ds1 *DS1) setupStreamLayerTypes() []d2enum.LayerStreamType {
 	return layerStream
 }
 
-func (ds1 *DS1) loadNPCs(br *d2common.StreamReader) {
+func (ds1 *DS1) loadNPCs(br *d2datautils.StreamReader) {
 	if ds1.Version >= 14 { //nolint:gomnd // Version number
 		numberOfNpcs := br.GetInt32()
 		for npcIdx := 0; npcIdx < int(numberOfNpcs); npcIdx++ {
@@ -217,13 +218,13 @@ func (ds1 *DS1) loadNPCs(br *d2common.StreamReader) {
 	}
 }
 
-func (ds1 *DS1) loadNpcPaths(br *d2common.StreamReader, objIdx, numPaths int) {
+func (ds1 *DS1) loadNpcPaths(br *d2datautils.StreamReader, objIdx, numPaths int) {
 	if ds1.Objects[objIdx].Paths == nil {
-		ds1.Objects[objIdx].Paths = make([]d2common.Path, numPaths)
+		ds1.Objects[objIdx].Paths = make([]d2path.Path, numPaths)
 	}
 
 	for pathIdx := 0; pathIdx < numPaths; pathIdx++ {
-		newPath := d2common.Path{}
+		newPath := d2path.Path{}
 		newPath.Position = d2vector.NewPosition(
 			float64(br.GetInt32()),
 			float64(br.GetInt32()))
@@ -236,7 +237,7 @@ func (ds1 *DS1) loadNpcPaths(br *d2common.StreamReader, objIdx, numPaths int) {
 	}
 }
 
-func (ds1 *DS1) loadLayerStreams(br *d2common.StreamReader, layerStream []d2enum.LayerStreamType) {
+func (ds1 *DS1) loadLayerStreams(br *d2datautils.StreamReader, layerStream []d2enum.LayerStreamType) {
 	var dirLookup = []int32{
 		0x00, 0x01, 0x02, 0x01, 0x02, 0x03, 0x03, 0x05, 0x05, 0x06,
 		0x06, 0x07, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,

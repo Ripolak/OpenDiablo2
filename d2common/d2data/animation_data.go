@@ -4,7 +4,12 @@ import (
 	"log"
 	"strings"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2datautils"
+)
+
+const (
+	numCofNameBytes = 8
+	numFlagBytes    = 144
 )
 
 // AnimationDataRecord represents a single entry in the animation data dictionary file
@@ -20,32 +25,34 @@ type AnimationDataRecord struct {
 }
 
 // AnimationData represents all of the animation data records, mapped by the COF index
-var AnimationData map[string][]*AnimationDataRecord //nolint:gochecknoglobals // Currently global by design
+type AnimationData map[string][]*AnimationDataRecord
 
 // LoadAnimationData loads the animation data table into the global AnimationData dictionary
-func LoadAnimationData(rawData []byte) {
-	AnimationData = make(map[string][]*AnimationDataRecord)
-	streamReader := d2common.CreateStreamReader(rawData)
+func LoadAnimationData(rawData []byte) AnimationData {
+	animdata := make(AnimationData)
+	streamReader := d2datautils.CreateStreamReader(rawData)
 
 	for !streamReader.EOF() {
 		dataCount := int(streamReader.GetInt32())
 		for i := 0; i < dataCount; i++ {
-			cofNameBytes := streamReader.ReadBytes(8)
+			cofNameBytes := streamReader.ReadBytes(numCofNameBytes)
 			data := &AnimationDataRecord{
-				COFName:            strings.ReplaceAll(string(cofNameBytes), string(0), ""),
+				COFName:            strings.ReplaceAll(string(cofNameBytes), string(byte(0)), ""),
 				FramesPerDirection: int(streamReader.GetInt32()),
 				AnimationSpeed:     int(streamReader.GetInt32()),
 			}
-			data.Flags = streamReader.ReadBytes(144)
+			data.Flags = streamReader.ReadBytes(numFlagBytes)
 			cofIndex := strings.ToLower(data.COFName)
 
-			if _, found := AnimationData[cofIndex]; !found {
-				AnimationData[cofIndex] = make([]*AnimationDataRecord, 0)
+			if _, found := animdata[cofIndex]; !found {
+				animdata[cofIndex] = make([]*AnimationDataRecord, 0)
 			}
 
-			AnimationData[cofIndex] = append(AnimationData[cofIndex], data)
+			animdata[cofIndex] = append(animdata[cofIndex], data)
 		}
 	}
 
-	log.Printf("Loaded %d animation data records", len(AnimationData))
+	log.Printf("Loaded %d animation data records", len(animdata))
+
+	return animdata
 }

@@ -15,18 +15,11 @@ const sampleRate = 44100
 
 var _ d2interface.AudioProvider = &AudioProvider{} // Static check to confirm struct conforms to interface
 
-// AudioProvider represents a provider capable of playing audio
-type AudioProvider struct {
-	audioContext *audio.Context // The Audio context
-	bgmAudio     *audio.Player  // The audio player
-	lastBgm      string
-	sfxVolume    float64
-	bgmVolume    float64
-}
-
 // CreateAudio creates an instance of ebiten's audio provider
-func CreateAudio() (*AudioProvider, error) {
-	result := &AudioProvider{}
+func CreateAudio(am *d2asset.AssetManager) (*AudioProvider, error) {
+	result := &AudioProvider{
+		asset: am,
+	}
 
 	var err error
 	result.audioContext, err = audio.NewContext(sampleRate)
@@ -39,6 +32,16 @@ func CreateAudio() (*AudioProvider, error) {
 	return result, nil
 }
 
+// AudioProvider represents a provider capable of playing audio
+type AudioProvider struct {
+	asset        *d2asset.AssetManager
+	audioContext *audio.Context // The Audio context
+	bgmAudio     *audio.Player  // The audio player
+	lastBgm      string
+	sfxVolume    float64
+	bgmVolume    float64
+}
+
 // PlayBGM loads an audio stream and plays it in the background
 func (eap *AudioProvider) PlayBGM(song string) {
 	if eap.lastBgm == song {
@@ -48,7 +51,10 @@ func (eap *AudioProvider) PlayBGM(song string) {
 	eap.lastBgm = song
 
 	if song == "" && eap.bgmAudio != nil && eap.bgmAudio.IsPlaying() {
-		_ = eap.bgmAudio.Pause()
+		err := eap.bgmAudio.Pause()
+		if err != nil {
+			log.Print(err)
+		}
 
 		return
 	}
@@ -61,7 +67,7 @@ func (eap *AudioProvider) PlayBGM(song string) {
 		}
 	}
 
-	audioStream, err := d2asset.LoadFileStream(song)
+	audioStream, err := eap.asset.LoadFileStream(song)
 
 	if err != nil {
 		panic(err)
@@ -96,9 +102,17 @@ func (eap *AudioProvider) PlayBGM(song string) {
 	}
 }
 
-// LoadSoundEffect loads a sound affect so that it canb e played
-func (eap *AudioProvider) LoadSoundEffect(sfx string) (d2interface.SoundEffect, error) {
-	result := CreateSoundEffect(sfx, eap.audioContext, eap.sfxVolume) // TODO: Split
+// LoadSound loads a sound affect so that it canb e played
+func (eap *AudioProvider) LoadSound(sfx string, loop, bgm bool) (d2interface.SoundEffect, error) {
+	volume := eap.sfxVolume
+	if bgm {
+		volume = eap.bgmVolume
+	}
+
+	result := eap.createSoundEffect(sfx, eap.audioContext, loop)
+
+	result.volumeScale = volume
+	result.SetVolume(volume)
 
 	return result, nil
 }
@@ -107,4 +121,54 @@ func (eap *AudioProvider) LoadSoundEffect(sfx string) (d2interface.SoundEffect, 
 func (eap *AudioProvider) SetVolumes(bgmVolume, sfxVolume float64) {
 	eap.sfxVolume = sfxVolume
 	eap.bgmVolume = bgmVolume
+}
+
+// createSoundEffect creates a new instance of ebiten's sound effect implementation.
+func (eap *AudioProvider) createSoundEffect(sfx string, context *audio.Context,
+	loop bool) *SoundEffect {
+	result := &SoundEffect{}
+
+	soundFile := "/data/global/sfx/"
+
+	if _, exists := eap.asset.Records.Sound.Details[sfx]; exists {
+		soundEntry := eap.asset.Records.Sound.Details[sfx]
+		soundFile += soundEntry.FileName
+	} else {
+		soundFile += sfx
+	}
+
+	audioData, err := eap.asset.LoadFileStream(soundFile)
+
+	if err != nil {
+		audioData, err = eap.asset.LoadFileStream("/data/global/music/" + sfx)
+	}
+
+	if err != nil {
+		panic(err)
+	}
+
+	d, err := wav.Decode(context, audioData)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var player *audio.Player
+
+	if loop {
+		s := audio.NewInfiniteLoop(d, d.Length())
+		result.panStream = newPanStreamFromReader(s)
+		player, err = audio.NewPlayer(context, result.panStream)
+	} else {
+		result.panStream = newPanStreamFromReader(d)
+		player, err = audio.NewPlayer(context, result.panStream)
+	}
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	result.player = player
+
+	return result
 }

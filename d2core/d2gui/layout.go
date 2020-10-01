@@ -1,21 +1,13 @@
 package d2gui
 
 import (
-	"github.com/OpenDiablo2/OpenDiablo2/d2common"
+	"errors"
+
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 )
-
-type layoutEntry struct {
-	widget widget
-
-	x      int
-	y      int
-	width  int
-	height int
-
-	mouseOver bool
-	mouseDown [3]bool
-}
 
 const layoutDebug = false // turns on debug rendering stuff for layouts
 
@@ -62,7 +54,8 @@ const (
 type Layout struct {
 	widgetBase
 
-	renderer d2interface.Renderer
+	renderer     d2interface.Renderer
+	assetManager *d2asset.AssetManager
 
 	width           int
 	height          int
@@ -72,10 +65,11 @@ type Layout struct {
 	entries         []*layoutEntry
 }
 
-func createLayout(renderer d2interface.Renderer, positionType PositionType) *Layout {
+func CreateLayout(renderer d2interface.Renderer, positionType PositionType, assetManager *d2asset.AssetManager) *Layout {
 	layout := &Layout{
 		renderer:     renderer,
 		positionType: positionType,
+		assetManager: assetManager,
 	}
 
 	layout.SetVisible(true)
@@ -102,7 +96,7 @@ func (l *Layout) SetHorizontalAlign(horizontalAlign HorizontalAlign) {
 // AddLayout adds a nested layout to this layout, given a position type.
 // Returns a pointer to the nested layout
 func (l *Layout) AddLayout(positionType PositionType) *Layout {
-	layout := createLayout(l.renderer, positionType)
+	layout := CreateLayout(l.renderer, positionType, l.assetManager)
 	l.entries = append(l.entries, &layoutEntry{widget: layout})
 
 	return layout
@@ -130,7 +124,7 @@ func (l *Layout) AddSpacerDynamic() *SpacerDynamic {
 
 // AddSprite given a path and palette, adds a Sprite as a layout entry
 func (l *Layout) AddSprite(imagePath, palettePath string) (*Sprite, error) {
-	sprite, err := createSprite(imagePath, palettePath)
+	sprite, err := createSprite(imagePath, palettePath, l.assetManager)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +137,7 @@ func (l *Layout) AddSprite(imagePath, palettePath string) (*Sprite, error) {
 // AddAnimatedSprite given a path, palette, and direction will add an animated
 // sprite as a layout entry
 func (l *Layout) AddAnimatedSprite(imagePath, palettePath string, direction AnimationDirection) (*AnimatedSprite, error) {
-	sprite, err := createAnimatedSprite(imagePath, palettePath, direction)
+	sprite, err := createAnimatedSprite(imagePath, palettePath, direction, l.assetManager)
 	if err != nil {
 		return nil, err
 	}
@@ -155,10 +149,12 @@ func (l *Layout) AddAnimatedSprite(imagePath, palettePath string, direction Anim
 
 // AddLabel given a string and a FontStyle, adds a text label as a layout entry
 func (l *Layout) AddLabel(text string, fontStyle FontStyle) (*Label, error) {
-	label, err := createLabel(l.renderer, text, fontStyle)
+	font, err := l.loadFont(fontStyle)
 	if err != nil {
 		return nil, err
 	}
+
+	label := createLabel(l.renderer, text, font)
 
 	l.entries = append(l.entries, &layoutEntry{widget: label})
 
@@ -167,7 +163,7 @@ func (l *Layout) AddLabel(text string, fontStyle FontStyle) (*Label, error) {
 
 // AddButton given a string and ButtonStyle, adds a button as a layout entry
 func (l *Layout) AddButton(text string, buttonStyle ButtonStyle) (*Button, error) {
-	button, err := createButton(l.renderer, text, buttonStyle)
+	button, err := l.createButton(l.renderer, text, buttonStyle)
 	if err != nil {
 		return nil, err
 	}
@@ -258,14 +254,14 @@ func (l *Layout) getContentSize() (width, height int) {
 
 		switch l.positionType {
 		case PositionTypeVertical:
-			width = d2common.MaxInt(width, w)
+			width = d2math.MaxInt(width, w)
 			height += h
 		case PositionTypeHorizontal:
 			width += w
-			height = d2common.MaxInt(height, h)
+			height = d2math.MaxInt(height, h)
 		case PositionTypeAbsolute:
-			width = d2common.MaxInt(width, x+w)
-			height = d2common.MaxInt(height, y+h)
+			width = d2math.MaxInt(width, x+w)
+			height = d2math.MaxInt(height, y+h)
 		}
 	}
 
@@ -274,7 +270,7 @@ func (l *Layout) getContentSize() (width, height int) {
 
 func (l *Layout) getSize() (width, height int) {
 	width, height = l.getContentSize()
-	return d2common.MaxInt(width, l.width), d2common.MaxInt(height, l.height)
+	return d2math.MaxInt(width, l.width), d2math.MaxInt(height, l.height)
 }
 
 func (l *Layout) onMouseButtonDown(event d2interface.MouseEvent) bool {
@@ -348,8 +344,8 @@ func (l *Layout) AdjustEntryPlacement() {
 			expanderWidth = (width - contentWidth) / expanderCount
 		}
 
-		expanderWidth = d2common.MaxInt(0, expanderWidth)
-		expanderHeight = d2common.MaxInt(0, expanderHeight)
+		expanderWidth = d2math.MaxInt(0, expanderWidth)
+		expanderHeight = d2math.MaxInt(0, expanderHeight)
 	}
 
 	var offsetX, offsetY int
@@ -420,10 +416,97 @@ func (l *Layout) handleEntryVerticalAlign(width int, entry *layoutEntry) {
 	}
 }
 
-// IsIn layout entry, spc. of an event.
-func (l *layoutEntry) IsIn(event d2interface.HandlerEvent) bool {
-	sx, sy := l.widget.ScreenPos()
-	rect := d2common.Rectangle{Left: sx, Top: sy, Width: l.width, Height: l.height}
+func (l *Layout) createButton(renderer d2interface.Renderer, text string,
+	buttonStyle ButtonStyle) (*Button,
+	error) {
+	config := getButtonStyleConfig(buttonStyle)
+	if config == nil {
+		return nil, errors.New("invalid button style")
+	}
 
-	return rect.IsInRect(event.X(), event.Y())
+	animation, loadErr := l.assetManager.LoadAnimation(config.animationPath, config.palettePath)
+	if loadErr != nil {
+		return nil, loadErr
+	}
+
+	var buttonWidth int
+
+	for i := 0; i < config.segmentsX; i++ {
+		w, _, err := animation.GetFrameSize(i)
+		if err != nil {
+			return nil, err
+		}
+
+		buttonWidth += w
+	}
+
+	var buttonHeight int
+
+	for i := 0; i < config.segmentsY; i++ {
+		_, h, err := animation.GetFrameSize(i * config.segmentsY)
+		if err != nil {
+			return nil, err
+		}
+
+		buttonHeight += h
+	}
+
+	font, loadErr := l.loadFont(config.fontStyle)
+	if loadErr != nil {
+		return nil, loadErr
+	}
+
+	textColor := rgbaColor(grey)
+	textWidth, textHeight := font.GetTextMetrics(text)
+	textX := half(buttonWidth) - half(textWidth)
+	textY := half(buttonHeight) - half(textHeight) + config.textOffset
+
+	surfaceCount := animation.GetFrameCount() / (config.segmentsX * config.segmentsY)
+	surfaces := make([]d2interface.Surface, surfaceCount)
+
+	for i := 0; i < surfaceCount; i++ {
+		surface, surfaceErr := renderer.NewSurface(buttonWidth, buttonHeight, d2enum.FilterNearest)
+		if surfaceErr != nil {
+			return nil, surfaceErr
+		}
+
+		segX, segY, frame := config.segmentsX, config.segmentsY, i
+		if segErr := renderSegmented(animation, segX, segY, frame, surface); segErr != nil {
+			return nil, segErr
+		}
+
+		font.SetColor(textColor)
+
+		var textOffsetX, textOffsetY int
+
+		switch buttonState(i) {
+		case buttonStatePressed, buttonStatePressedToggled:
+			textOffsetX = -2
+			textOffsetY = 2
+		}
+
+		surface.PushTranslation(textX+textOffsetX, textY+textOffsetY)
+		surfaceErr = font.RenderText(text, surface)
+		surface.Pop()
+
+		if surfaceErr != nil {
+			return nil, surfaceErr
+		}
+
+		surfaces[i] = surface
+	}
+
+	button := &Button{width: buttonWidth, height: buttonHeight, surfaces: surfaces}
+	button.SetVisible(true)
+
+	return button, nil
+}
+
+func (l *Layout) loadFont(fontStyle FontStyle) (*d2asset.Font, error) {
+	config := getFontStyleConfig(fontStyle)
+	if config == nil {
+		return nil, errors.New("invalid font style")
+	}
+
+	return l.assetManager.LoadFont(config.fontBasePath+".tbl", config.fontBasePath+".dc6", config.palettePath)
 }

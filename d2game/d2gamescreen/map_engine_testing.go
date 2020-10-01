@@ -7,19 +7,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common"
-
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
-
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapgen"
-
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
-	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2hero"
 
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapengine"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2mapgen"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2map/d2maprenderer"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2screen"
-	"github.com/OpenDiablo2/OpenDiablo2/d2game/d2player"
 )
 
 type regionSpec struct {
@@ -87,13 +85,17 @@ func getRegions() []regionSpec {
 
 // MapEngineTest represents the MapEngineTest screen
 type MapEngineTest struct {
-	gameState     *d2player.PlayerState
-	mapEngine     *d2mapengine.MapEngine
-	mapRenderer   *d2maprenderer.MapRenderer
-	terminal      d2interface.Terminal
-	renderer      d2interface.Renderer
-	inputManager  d2interface.InputManager
-	audioProvider d2interface.AudioProvider
+	asset              *d2asset.AssetManager
+	playerStateFactory *d2hero.HeroStateFactory
+	playerState        *d2hero.HeroState
+	mapEngine          *d2mapengine.MapEngine
+	mapGen             *d2mapgen.MapGenerator
+	mapRenderer        *d2maprenderer.MapRenderer
+	terminal           d2interface.Terminal
+	renderer           d2interface.Renderer
+	inputManager       d2interface.InputManager
+	audioProvider      d2interface.AudioProvider
+	screen             *d2screen.ScreenManager
 
 	lastMouseX, lastMouseY int
 	selX, selY             int
@@ -111,25 +113,36 @@ type MapEngineTest struct {
 // CreateMapEngineTest creates the Map Engine Test screen and returns a pointer to it
 func CreateMapEngineTest(currentRegion,
 	levelPreset int,
+	asset *d2asset.AssetManager,
 	term d2interface.Terminal,
 	renderer d2interface.Renderer,
 	inputManager d2interface.InputManager,
 	audioProvider d2interface.AudioProvider,
-) *MapEngineTest {
-	result := &MapEngineTest{
-		currentRegion: currentRegion,
-		levelPreset:   levelPreset,
-		fileIndex:     0,
-		regionSpec:    regionSpec{},
-		filesCount:    0,
-		terminal:      term,
-		renderer:      renderer,
-		inputManager:  inputManager,
-		audioProvider: audioProvider,
+	screen *d2screen.ScreenManager,
+) (*MapEngineTest, error) {
+	heroStateFactory, err := d2hero.NewHeroStateFactory(asset)
+	if err != nil {
+		return nil, err
 	}
-	result.gameState = d2player.CreateTestGameState()
 
-	return result
+	result := &MapEngineTest{
+		currentRegion:      currentRegion,
+		levelPreset:        levelPreset,
+		fileIndex:          0,
+		regionSpec:         regionSpec{},
+		filesCount:         0,
+		asset:              asset,
+		terminal:           term,
+		renderer:           renderer,
+		inputManager:       inputManager,
+		audioProvider:      audioProvider,
+		screen:             screen,
+		playerStateFactory: heroStateFactory,
+	}
+
+	result.playerState = heroStateFactory.CreateTestGameState()
+
+	return result, nil
 }
 
 func (met *MapEngineTest) loadRegionByIndex(n, levelPreset, fileIndex int) {
@@ -164,21 +177,23 @@ func (met *MapEngineTest) loadRegionByIndex(n, levelPreset, fileIndex int) {
 		met.levelPreset = levelPreset
 	}
 
+	mapGen, _ := d2mapgen.NewMapGenerator(met.asset, met.mapEngine)
+	met.mapGen = mapGen
+
 	if n == 0 {
 		met.mapEngine.SetSeed(time.Now().UnixNano())
-		d2mapgen.GenerateAct1Overworld(met.mapEngine)
+		met.mapGen.GenerateAct1Overworld()
 	} else {
-		met.mapEngine = d2mapengine.CreateMapEngine() // necessary for map name update
+		met.mapEngine = d2mapengine.CreateMapEngine(met.asset) // necessary for map name update
 		met.mapEngine.SetSeed(time.Now().UnixNano())
 		met.mapEngine.GenerateMap(d2enum.RegionIdType(n), levelPreset, fileIndex)
-		//met.mapEngine.RegenerateWalkPaths()
 	}
 
 	met.mapRenderer.SetMapEngine(met.mapEngine)
 	position := d2vector.NewPosition(met.mapRenderer.WorldToOrtho(met.mapEngine.GetCenterPosition()))
 	met.mapRenderer.SetCameraPosition(&position)
 
-	musicDef := d2common.GetMusicDef(met.regionSpec.regionType)
+	musicDef := d2resource.GetMusicDef(met.regionSpec.regionType)
 
 	met.audioProvider.PlayBGM(musicDef.MusicFile)
 }
@@ -191,11 +206,12 @@ func (met *MapEngineTest) OnLoad(loading d2screen.LoadingState) {
 
 	loading.Progress(twentyPercent)
 
-	met.mapEngine = d2mapengine.CreateMapEngine()
+	met.mapEngine = d2mapengine.CreateMapEngine(met.asset)
 
 	loading.Progress(fiftyPercent)
 
-	met.mapRenderer = d2maprenderer.CreateMapRenderer(met.renderer, met.mapEngine, met.terminal, 0.0, 0.0)
+	met.mapRenderer = d2maprenderer.CreateMapRenderer(met.asset, met.renderer, met.mapEngine,
+		met.terminal, 0.0, 0.0)
 
 	loading.Progress(seventyPercent)
 	met.loadRegionByIndex(met.currentRegion, met.levelPreset, met.fileIndex)
@@ -323,20 +339,10 @@ func (met *MapEngineTest) OnMouseMove(event d2interface.MouseMoveEvent) bool {
 	return false
 }
 
+// OnMouseButtonDown handles mouse button down events
 func (met *MapEngineTest) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 	if event.Button() == d2enum.MouseButtonLeft {
-		px, py := met.mapRenderer.ScreenToWorld(met.lastMouseX, met.lastMouseY)
-		met.selX = int(px)
-		met.selY = int(py)
-		met.selectedTile = met.mapEngine.TileAt(int(px), int(py))
-
-		camVect := met.mapRenderer.Camera.GetPosition().Vector
-
-		x, y := float64(met.lastMouseX-400)/5, float64(met.lastMouseY-300)/5
-		targetPosition := d2vector.NewPositionTile(x, y)
-		targetPosition.Add(&camVect)
-
-		met.mapRenderer.SetCameraTarget(&targetPosition)
+		met.handleLeftClick()
 
 		return true
 	}
@@ -350,25 +356,30 @@ func (met *MapEngineTest) OnMouseButtonDown(event d2interface.MouseEvent) bool {
 	return false
 }
 
+// OnMouseButtonRepeat handles repeated mouse clicks
 func (met *MapEngineTest) OnMouseButtonRepeat(event d2interface.MouseEvent) bool {
 	if event.Button() == d2enum.MouseButtonLeft {
-		px, py := met.mapRenderer.ScreenToWorld(met.lastMouseX, met.lastMouseY)
-		met.selX = int(px)
-		met.selY = int(py)
-		met.selectedTile = met.mapEngine.TileAt(int(px), int(py))
-
-		camVect := met.mapRenderer.Camera.GetPosition().Vector
-
-		x, y := float64(met.lastMouseX-400)/5, float64(met.lastMouseY-300)/5
-		targetPosition := d2vector.NewPositionTile(x, y)
-		targetPosition.Add(&camVect)
-
-		met.mapRenderer.SetCameraTarget(&targetPosition)
+		met.handleLeftClick()
 
 		return true
 	}
 
 	return false
+}
+
+func (met *MapEngineTest) handleLeftClick() {
+	px, py := met.mapRenderer.ScreenToWorld(met.lastMouseX, met.lastMouseY)
+	met.selX = int(px)
+	met.selY = int(py)
+	met.selectedTile = met.mapEngine.TileAt(int(px), int(py))
+
+	camVect := met.mapRenderer.Camera.GetPosition().Vector
+
+	x, y := float64(met.lastMouseX-400)/5, float64(met.lastMouseY-300)/5
+	targetPosition := d2vector.NewPositionTile(x, y)
+	targetPosition.Add(&camVect)
+
+	met.mapRenderer.SetCameraTarget(&targetPosition)
 }
 
 // Advance runs the update logic on the Map Engine Test screen
@@ -428,13 +439,13 @@ func (met *MapEngineTest) OnKeyDown(event d2interface.KeyEvent) bool {
 		switch event.KeyMod() {
 		case d2enum.KeyModControl:
 			met.fileIndex++
-			d2screen.SetNextScreen(met)
+			met.screen.SetNextScreen(met)
 		case d2enum.KeyModShift:
 			met.levelPreset = increment(met.levelPreset, met.regionSpec.startPresetIndex, met.regionSpec.endPresetIndex)
-			d2screen.SetNextScreen(met)
+			met.screen.SetNextScreen(met)
 		default:
 			met.currentRegion = increment(met.currentRegion, 0, len(getRegions()))
-			d2screen.SetNextScreen(met)
+			met.screen.SetNextScreen(met)
 		}
 
 		return true
@@ -444,13 +455,13 @@ func (met *MapEngineTest) OnKeyDown(event d2interface.KeyEvent) bool {
 		switch event.KeyMod() {
 		case d2enum.KeyModControl:
 			met.fileIndex--
-			d2screen.SetNextScreen(met)
+			met.screen.SetNextScreen(met)
 		case d2enum.KeyModShift:
 			met.levelPreset = decrement(met.levelPreset, met.regionSpec.startPresetIndex, met.regionSpec.endPresetIndex)
-			d2screen.SetNextScreen(met)
+			met.screen.SetNextScreen(met)
 		default:
 			met.currentRegion = decrement(met.currentRegion, 0, len(getRegions()))
-			d2screen.SetNextScreen(met)
+			met.screen.SetNextScreen(met)
 		}
 
 		return true

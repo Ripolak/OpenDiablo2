@@ -3,13 +3,12 @@ package d2mapentity
 import (
 	"math/rand"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
+	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2records"
 
-	"github.com/OpenDiablo2/OpenDiablo2/d2common"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2data/d2datadict"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2enum"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2interface"
 	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2math/d2vector"
-	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2resource"
+	"github.com/OpenDiablo2/OpenDiablo2/d2common/d2path"
 	"github.com/OpenDiablo2/OpenDiablo2/d2core/d2asset"
 )
 
@@ -17,14 +16,14 @@ import (
 // For example, Deckard Cain.
 type NPC struct {
 	mapEntity
-	Paths         []d2common.Path
+	Paths         []d2path.Path
 	name          string
 	composite     *d2asset.Composite
 	action        int
 	path          int
 	repetitions   int
-	monstatRecord *d2datadict.MonStatsRecord
-	monstatEx     *d2datadict.MonStats2Record
+	monstatRecord *d2records.MonStatsRecord
+	monstatEx     *d2records.MonStats2Record
 	HasPaths      bool
 	isDone        bool
 }
@@ -37,52 +36,17 @@ const (
 	maxAnimationRepetitions = 5
 )
 
-// CreateNPC creates a new NPC and returns a pointer to it.
-func CreateNPC(x, y int, monstat *d2datadict.MonStatsRecord, direction int) (*NPC, error) {
-	result := &NPC{
-		mapEntity:     newMapEntity(x, y),
-		HasPaths:      false,
-		monstatRecord: monstat,
-		monstatEx:     d2datadict.MonStats2[monstat.ExtraDataKey],
-	}
-
-	var equipment [16]string
-
-	for compType, opts := range result.monstatEx.EquipmentOptions {
-		equipment[compType] = selectEquip(opts)
-	}
-
-	composite, _ := d2asset.LoadComposite(d2enum.ObjectTypeCharacter, monstat.AnimationDirectoryToken,
-		d2resource.PaletteUnits)
-	result.composite = composite
-
-	if err := composite.SetMode(d2enum.MonsterAnimationModeNeutral,
-		result.monstatEx.BaseWeaponClass); err != nil {
-		return nil, err
-	}
-
-	if err := composite.Equip(&equipment); err != nil {
-		return nil, err
-	}
-
-	result.SetSpeed(float64(monstat.SpeedBase))
-	result.mapEntity.directioner = result.rotate
-
-	result.composite.SetDirection(direction)
-
-	if result.monstatRecord != nil && result.monstatRecord.IsInteractable {
-		result.name = d2common.TranslateString(result.monstatRecord.NameString)
-	}
-
-	return result, nil
-}
-
 func selectEquip(slice []string) string {
 	if len(slice) != 0 {
 		return slice[rand.Intn(len(slice))]
 	}
 
 	return ""
+}
+
+// ID returns the NPC uuid
+func (v *NPC) ID() string {
+	return v.mapEntity.uuid
 }
 
 // Render renders this entity's animated composite.
@@ -101,12 +65,12 @@ func (v *NPC) Render(target d2interface.Surface) {
 }
 
 // Path returns the current part of the entity's path.
-func (v *NPC) Path() d2common.Path {
+func (v *NPC) Path() d2path.Path {
 	return v.Paths[v.path]
 }
 
 // NextPath returns the next part of the entity's path.
-func (v *NPC) NextPath() d2common.Path {
+func (v *NPC) NextPath() d2path.Path {
 	v.path++
 	if v.path == len(v.Paths) {
 		v.path = 0
@@ -118,7 +82,7 @@ func (v *NPC) NextPath() d2common.Path {
 // SetPaths sets the entity's paths to the given slice. It also sets flags
 // on the entity indicating that it has paths and has completed the
 // previous none.
-func (v *NPC) SetPaths(paths []d2common.Path) {
+func (v *NPC) SetPaths(paths []d2path.Path) {
 	v.Paths = paths
 	v.HasPaths = len(paths) > 0
 	v.isDone = true
@@ -203,8 +167,8 @@ func (v *NPC) Selectable() bool {
 	return v.name != ""
 }
 
-// Name returns the NPC's in-game name (e.g. "Deckard Cain") or an empty string if it does not have a name.
-func (v *NPC) Name() string {
+// Label returns the NPC's in-game name (e.g. "Deckard Cain") or an empty string if it does not have a name.
+func (v *NPC) Label() string {
 	return v.name
 }
 
@@ -216,4 +180,9 @@ func (v *NPC) GetPosition() d2vector.Position {
 // GetVelocity returns the NPC's velocity vector
 func (v *NPC) GetVelocity() d2vector.Vector {
 	return v.mapEntity.velocity
+}
+
+// GetSize returns the current frame size
+func (v *NPC) GetSize() (width, height int) {
+	return v.composite.GetSize()
 }
